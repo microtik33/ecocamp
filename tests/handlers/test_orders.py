@@ -14,47 +14,6 @@ if TYPE_CHECKING:
     from _pytest.fixtures import FixtureRequest
     from _pytest.monkeypatch import MonkeyPatch
 
-# Мокаем необходимые модули перед импортом order
-mock_config = MagicMock()
-mock_config.GOOGLE_CREDENTIALS_FILE = 'fake_credentials.json'
-sys.modules['config'] = mock_config
-
-# Создаем мок для orders_sheet
-mock_orders_sheet = MagicMock()
-mock_orders_sheet.get_all_values = MagicMock()
-mock_orders_sheet.get_all_values.return_value = [
-    ['ID', 'Timestamp', 'Status', 'UserID', 'Username', 'Total', 'Room', 'Name', 'MealType', 'Dishes', 'Wishes', 'DeliveryDate'],
-    ['123', '2024-04-04 12:00:00', 'Активен', '1', '@test_user', '250', '101', 'Test User', 'breakfast', 'Блюдо 1', '-', '05.04.24']
-]
-mock_orders_sheet.update_cell = MagicMock()
-
-mock_sheets = MagicMock()
-mock_sheets.get_order = AsyncMock()
-mock_sheets.save_order = AsyncMock()
-mock_sheets.update_order = AsyncMock()
-mock_sheets.get_next_order_id = MagicMock(return_value='123')
-mock_sheets.orders_sheet = mock_orders_sheet
-sys.modules['services.sheets'] = mock_sheets
-
-mock_user = MagicMock()
-mock_user.update_user_info = AsyncMock()
-mock_user.update_user_stats = AsyncMock()
-sys.modules['services.user'] = mock_user
-
-mock_time_utils = MagicMock()
-mock_time_utils.is_order_time.return_value = True
-sys.modules['utils.time_utils'] = mock_time_utils
-
-mock_auth = MagicMock()
-mock_auth.is_user_authorized.return_value = True
-sys.modules['services.auth'] = mock_auth
-
-mock_translations = MagicMock()
-mock_translations.get_meal_type = MagicMock(return_value='Завтрак')
-mock_translations.get_button = MagicMock(return_value='Кнопка')
-mock_translations.get_message = MagicMock(return_value='Сообщение')
-sys.modules['translations'] = mock_translations
-
 from orderbot.handlers import order
 
 @pytest.fixture
@@ -128,43 +87,68 @@ async def test_process_order_save_success(
     }
 
     # Настраиваем мок для save_order
-    mock_sheets.save_order.return_value = True
+    from orderbot.services import sheets
+    sheets.save_order.return_value = True
 
     # Вызываем тестируемую функцию
     result = await order.process_order_save(mock_update, mock_context)
 
     # Проверяем результат
     assert result is not None
-    mock_sheets.save_order.assert_called_once()
+    sheets.save_order.assert_called_once()
     assert mock_context.user_data['order']['order_id'] == "123"
 
 @pytest.mark.asyncio
-async def test_cancel_order_success(
-    mock_update: Update,
-    mock_context: MagicMock,
-) -> None:
+async def test_cancel_order_success(mocker: MockerFixture) -> None:
     """Тест успешной отмены заказа."""
-    # Подготовка данных
-    order_id = "123"
-    mock_context.user_data['current_order_id'] = order_id
-    mock_context.user_data['order'] = {  # Добавляем данные заказа
-        'order_id': order_id,
-        'room': '101',
-        'name': 'Test User',
-        'meal_type': 'breakfast',
-        'dishes': ['Блюдо 1'],
-        'status': 'Активен'
+    # Подготавливаем данные заказа
+    order_data = {
+        'order_id': '123',
+        'status': 'Активен',
+        'user_id': '1',
+        'order_chat_id': '100'
     }
-
-    # Настраиваем мок для update_order
-    mock_sheets.update_order.return_value = True
-
+    
+    # Мокаем необходимые объекты
+    callback_query = mocker.MagicMock()
+    callback_query.from_user.id = '1'
+    callback_query.data = 'cancel_123'
+    callback_query.message = mocker.AsyncMock()
+    callback_query.message.chat.id = '100'
+    callback_query.message.delete = mocker.AsyncMock()
+    callback_query.answer = mocker.AsyncMock()
+    callback_query.edit_message_text = mocker.AsyncMock()
+    
+    # Создаем мок для context
+    context = mocker.MagicMock()
+    context.user_data = {'order': order_data}
+    
+    # Мокаем sheets.get_order
+    mocker.patch('orderbot.services.sheets.get_order', return_value=order_data)
+    
+    # Мокаем translations
+    mocker.patch('orderbot.translations.get_message', return_value='Заказ успешно отменён')
+    mocker.patch('orderbot.translations.get_button', side_effect=lambda x: x)
+    
+    # Мокаем update_user_stats
+    mocker.patch('orderbot.handlers.order.update_user_stats', return_value=None)
+    
     # Вызываем тестируемую функцию
-    result = await order.cancel_order(mock_update, mock_context)
-
-    # Проверяем результат
-    assert result is not None
-    mock_orders_sheet.update_cell.assert_called_once_with(2, 3, 'Отменён')
+    from orderbot.handlers.order import cancel_order
+    result = await cancel_order(callback_query, context)
+    
+    # Проверяем, что были вызваны нужные методы
+    callback_query.answer.assert_awaited_once()
+    
+    # Проверяем, что статус заказа был обновлен
+    from orderbot.services.sheets import orders_sheet
+    orders_sheet.update_cell.assert_called_once_with(2, 3, 'Отменён')
+    
+    # Проверяем, что сообщение было обновлено
+    callback_query.edit_message_text.assert_awaited_once()
+    
+    # Проверяем, что context был очищен
+    assert context.user_data == {}
 
 @pytest.mark.asyncio
 async def test_get_order_info_success(
@@ -190,14 +174,19 @@ async def test_get_order_info_success(
     }
 
     # Сбрасываем счетчик вызовов
-    mock_orders_sheet.get_all_values.reset_mock()
+    from orderbot.services import sheets
+    sheets.orders_sheet.get_all_values.reset_mock()
+    sheets.orders_sheet.get_all_values.return_value = [
+        ['ID', 'Timestamp', 'Status', 'UserID', 'Username', 'Total', 'Room', 'Name', 'MealType', 'Dishes', 'Wishes', 'DeliveryDate'],
+        ['123', '2024-04-04 12:00:00', 'Активен', '1', '@test_user', '250', '101', 'Test User', 'breakfast', 'Блюдо 1', '-', '05.04.24']
+    ]
 
     # Вызываем тестируемую функцию
     result = await order.get_order_info(order_id)
 
     # Проверяем результат
     assert result == expected_order
-    mock_orders_sheet.get_all_values.assert_called_once()
+    sheets.orders_sheet.get_all_values.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_handle_order_update_success(
@@ -226,7 +215,8 @@ async def test_handle_order_update_success(
     }
 
     # Настраиваем мок для update_order
-    mock_sheets.update_order.return_value = True
+    from orderbot.services import sheets
+    sheets.update_order.return_value = True
     
     # Устанавливаем корректное значение для callback_query.data
     mock_update.callback_query.data = 'edit_order'

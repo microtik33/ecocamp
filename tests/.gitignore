@@ -1,26 +1,56 @@
-# Python cache files
+# Приватные данные
+.env
+credentials.json
+temp_credentials.json
+encoded_credentials.txt
+decoded_credentials.json
+
+# Python
 __pycache__/
+*/__pycache__/
+*/*/__pycache__/
+*/*/*/__pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# pytest cache
-.pytest_cache/
-
-# Coverage reports
-.coverage
-htmlcov/
-
-# Virtual environment
+# Virtual Environment
 venv/
+ENV/
 env/
 
-# IDE specific files
+# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# Test output files
-.coverage.*
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+nosetests.xml
 coverage.xml
-*.cover 
+*.cover
+.hypothesis/
+
+# Environment variables
+.env
+credentials.json

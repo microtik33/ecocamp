@@ -4,13 +4,83 @@ import sys
 from pathlib import Path
 import pytest
 import asyncio
-from typing import Generator
+from typing import Generator, TYPE_CHECKING
+from unittest.mock import MagicMock, AsyncMock
 
 # Добавляем корневую директорию проекта в PYTHONPATH
 project_root = str(Path(__file__).parent.parent)
 sys.path.insert(0, project_root)
 
 pytest_plugins = ["pytest_asyncio"]
+
+if TYPE_CHECKING:
+    from _pytest.fixtures import FixtureRequest
+    from _pytest.monkeypatch import MonkeyPatch
+    from _pytest.logging import LogCaptureFixture
+    from pytest_mock import MockerFixture
+
+# Мокаем config
+mock_config = MagicMock()
+mock_config.BOT_TOKEN = 'fake_token'
+mock_config.GOOGLE_CREDENTIALS_FILE = 'fake_credentials.json'
+sys.modules['orderbot.config'] = mock_config
+
+# Мокаем gspread
+mock_gspread = MagicMock()
+mock_gspread.service_account = MagicMock(return_value=MagicMock())
+sys.modules['gspread'] = mock_gspread
+
+# Создаем мок для orders_sheet
+mock_orders_sheet = MagicMock()
+mock_orders_sheet.get_all_values = MagicMock()
+mock_orders_sheet.get_all_values.return_value = [
+    ['ID', 'Timestamp', 'Status', 'UserID', 'Username', 'Total', 'Room', 'Name', 'MealType', 'Dishes', 'Wishes', 'DeliveryDate'],
+    ['123', '2024-04-04 12:00:00', 'Активен', '1', '@test_user', '250', '101', 'Test User', 'breakfast', 'Блюдо 1', '-', '05.04.24']
+]
+mock_orders_sheet.update_cell = MagicMock()
+mock_orders_sheet.find = MagicMock(return_value=MagicMock(row=2))
+
+# Мокаем services.sheets
+mock_sheets = MagicMock()
+mock_sheets.client = MagicMock()
+mock_sheets.orders_sheet = mock_orders_sheet
+mock_sheets.users_sheet = MagicMock()
+mock_sheets.get_order = AsyncMock(return_value=True)
+mock_sheets.save_order = AsyncMock(return_value=True)
+mock_sheets.update_order = AsyncMock(return_value=True)
+mock_sheets.get_next_order_id = MagicMock(return_value='123')
+mock_sheets.update_orders_status = AsyncMock(return_value=True)
+sys.modules['orderbot.services.sheets'] = mock_sheets
+
+# Мокаем services.user
+mock_user = MagicMock()
+mock_user.update_user_info = AsyncMock(return_value=True)
+mock_user.update_user_stats = AsyncMock(return_value=True)
+sys.modules['orderbot.services.user'] = mock_user
+
+# Мокаем services.auth
+mock_auth = MagicMock()
+mock_auth.is_user_authorized = MagicMock(return_value=True)
+sys.modules['orderbot.services.auth'] = mock_auth
+
+# Мокаем utils.time_utils
+mock_time_utils = MagicMock()
+mock_time_utils.is_order_time = MagicMock(return_value=True)
+sys.modules['orderbot.utils.time_utils'] = mock_time_utils
+
+# Мокаем translations
+mock_translations = MagicMock()
+mock_translations.get_meal_type = MagicMock(return_value='Завтрак')
+mock_translations.get_button = MagicMock(return_value='Кнопка')
+mock_translations.get_message = MagicMock(return_value='Сообщение')
+sys.modules['orderbot.translations'] = mock_translations
+
+# Мокаем tasks
+mock_tasks = MagicMock()
+mock_tasks.start_status_update_task = MagicMock()
+mock_tasks.stop_status_update_task = MagicMock()
+mock_tasks.schedule_daily_tasks = AsyncMock(return_value=True)
+sys.modules['orderbot.tasks'] = mock_tasks
 
 @pytest.fixture(scope="session")
 def event_loop_policy() -> Generator[asyncio.AbstractEventLoopPolicy, None, None]:
@@ -27,6 +97,29 @@ async def cleanup_tasks():
     for task in tasks:
         task.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
+
+@pytest.fixture(autouse=True)
+def reset_mocks() -> Generator[None, None, None]:
+    """Сбрасываем состояние моков перед каждым тестом."""
+    mock_sheets.get_order.reset_mock()
+    mock_sheets.save_order.reset_mock()
+    mock_sheets.update_order.reset_mock()
+    mock_sheets.get_next_order_id.reset_mock()
+    mock_sheets.update_orders_status.reset_mock()
+    mock_orders_sheet.get_all_values.reset_mock()
+    mock_orders_sheet.update_cell.reset_mock()
+    mock_orders_sheet.find.reset_mock()
+    mock_user.update_user_info.reset_mock()
+    mock_user.update_user_stats.reset_mock()
+    mock_auth.is_user_authorized.reset_mock()
+    mock_time_utils.is_order_time.reset_mock()
+    mock_translations.get_meal_type.reset_mock()
+    mock_translations.get_button.reset_mock()
+    mock_translations.get_message.reset_mock()
+    mock_tasks.start_status_update_task.reset_mock()
+    mock_tasks.stop_status_update_task.reset_mock()
+    mock_tasks.schedule_daily_tasks.reset_mock()
+    yield
 
 def pytest_addoption(parser):
     """Добавляем опции для pytest."""

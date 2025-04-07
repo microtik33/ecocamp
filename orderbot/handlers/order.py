@@ -860,7 +860,8 @@ async def cancel_order(update: telegram.Update, context: telegram.ext.ContextTyp
     
     try:
         # Получаем все заказы и ищем нужный для отмены
-        all_orders = orders_sheet.get_all_values()
+        from ..services import sheets
+        all_orders = sheets.orders_sheet.get_all_values()
         order_found = False
         
         for idx, row in enumerate(all_orders):
@@ -870,7 +871,7 @@ async def cancel_order(update: telegram.Update, context: telegram.ext.ContextTyp
                 
                 # Меняем статус заказа на "Отменён" (учитываем, что индексы в таблице начинаются с 1)
                 # Колонка C (индекс 2) содержит статус заказа
-                orders_sheet.update_cell(idx + 1, 3, 'Отменён')
+                sheets.orders_sheet.update_cell(idx + 1, 3, 'Отменён')
                 order_found = True
                 break
         
