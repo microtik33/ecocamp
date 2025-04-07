@@ -79,8 +79,8 @@ async def test_schedule_daily_tasks_sequence(mock_dependencies: Dict[str, AsyncM
         # Запускаем задачу в фоне
         task = asyncio.create_task(schedule_daily_tasks())
 
-        # Ждем достаточно долго, чтобы задача успела выполниться (2 секунды)
-        await asyncio.sleep(2)
+        # Ждем достаточно долго, чтобы задача успела выполниться (5 секунд)
+        await asyncio.sleep(5)
 
         # Отменяем задачу
         task.cancel()
@@ -122,8 +122,8 @@ async def test_update_orders_status_before_processing(mock_dependencies: Dict[st
         task = asyncio.create_task(schedule_daily_tasks())
         logging.info("Задача запущена")
 
-        # Ждем достаточно долго, чтобы задача успела выполниться (65 секунд)
-        await asyncio.sleep(65)
+        # Ждем достаточно долго, чтобы задача успела выполниться (5 секунд)
+        await asyncio.sleep(5)
         logging.info("Прошло время ожидания")
 
         # Отменяем задачу
@@ -145,9 +145,7 @@ async def test_process_daily_orders_waits_for_status_update(mock_dependencies: D
 
     # Создаем мок для datetime.now()
     mock_now = MagicMock()
-    mock_time = MagicMock()
-    mock_time.hour = 0
-    mock_time.minute = 0
+    mock_time = time(0, 0)  # Используем реальный объект time
     mock_now.return_value = MagicMock()
     mock_now.return_value.time.return_value = mock_time
     logging.info(f"Создан мок для datetime.now() с hour={mock_time.hour}, minute={mock_time.minute}")
@@ -177,9 +175,9 @@ async def test_process_daily_orders_waits_for_status_update(mock_dependencies: D
         mock_dependencies['process_orders'].assert_not_called()
         logging.info("process_daily_orders еще не вызван")
 
-        # Ждем достаточно долго, чтобы задача успела выполниться (65 секунд)
-        await asyncio.sleep(65)
-        logging.info("Прошло 65 секунд")
+        # Ждем достаточно долго, чтобы задача успела выполниться (5 секунд)
+        await asyncio.sleep(5)
+        logging.info("Прошло 5 секунд")
 
         # Отменяем задачу
         task.cancel()

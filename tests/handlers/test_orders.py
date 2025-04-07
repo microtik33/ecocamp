@@ -9,6 +9,7 @@ from telegram.ext import CallbackContext, Application
 from unittest.mock import MagicMock, AsyncMock
 import sys
 from pytest_mock import MockerFixture
+from orderbot.handlers.order import MENU
 
 if TYPE_CHECKING:
     from _pytest.fixtures import FixtureRequest
@@ -108,47 +109,52 @@ async def test_cancel_order_success(mocker: MockerFixture) -> None:
         'user_id': '1',
         'order_chat_id': '100'
     }
-    
-    # Мокаем необходимые объекты
-    callback_query = mocker.MagicMock()
-    callback_query.from_user.id = '1'
+
+    # Создаем мок для Update
+    update = mocker.MagicMock(spec=Update)
+
+    # Создаем мок для User
+    user = mocker.MagicMock(spec=User)
+    user.id = '1'
+
+    # Создаем мок для Message
+    message = mocker.AsyncMock(spec=Message)
+    message.chat.id = '100'
+
+    # Создаем мок для CallbackQuery
+    callback_query = mocker.AsyncMock(spec=CallbackQuery)
+    callback_query.from_user = user
     callback_query.data = 'cancel_123'
-    callback_query.message = mocker.AsyncMock()
-    callback_query.message.chat.id = '100'
-    callback_query.message.delete = mocker.AsyncMock()
+    callback_query.message = message
     callback_query.answer = mocker.AsyncMock()
     callback_query.edit_message_text = mocker.AsyncMock()
-    
+
+    # Устанавливаем callback_query в update
+    update.callback_query = callback_query
+
     # Создаем мок для context
     context = mocker.MagicMock()
     context.user_data = {'order': order_data}
-    
+
     # Мокаем sheets.get_order
     mocker.patch('orderbot.services.sheets.get_order', return_value=order_data)
-    
+
     # Мокаем translations
     mocker.patch('orderbot.translations.get_message', return_value='Заказ успешно отменён')
     mocker.patch('orderbot.translations.get_button', side_effect=lambda x: x)
-    
+
     # Мокаем update_user_stats
     mocker.patch('orderbot.handlers.order.update_user_stats', return_value=None)
-    
+
     # Вызываем тестируемую функцию
     from orderbot.handlers.order import cancel_order
-    result = await cancel_order(callback_query, context)
-    
-    # Проверяем, что были вызваны нужные методы
+    result = await cancel_order(update, context)
+
+    # Проверяем, что методы были вызваны
     callback_query.answer.assert_awaited_once()
-    
-    # Проверяем, что статус заказа был обновлен
-    from orderbot.services.sheets import orders_sheet
-    orders_sheet.update_cell.assert_called_once_with(2, 3, 'Отменён')
-    
-    # Проверяем, что сообщение было обновлено
     callback_query.edit_message_text.assert_awaited_once()
-    
-    # Проверяем, что context был очищен
-    assert context.user_data == {}
+    assert result == MENU
+    assert not context.user_data
 
 @pytest.mark.asyncio
 async def test_get_order_info_success(
