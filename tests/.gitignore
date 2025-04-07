@@ -1,3 +1,16 @@
+# Кэш-файлы
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+**/.pytest_cache/
+**/.coverage
+**/htmlcov/
+**/.tox/
+**/nosetests.xml
+**/coverage.xml
+**/*.cover
+**/.hypothesis/
+
 # Приватные данные
 .env
 credentials.json
