@@ -7,7 +7,7 @@ from telegram.ext import (
     filters
 )
 from telegram import Update
-from .handlers.menu import start
+from .handlers.menu import start, show_tomorrow_menu
 from .handlers.order import (
     PHONE, MENU, ROOM, NAME, MEAL_TYPE, 
     DISH_SELECTION, WISHES, QUESTION,
@@ -103,7 +103,8 @@ async def main() -> None:
                     CallbackQueryHandler(handle_question, pattern='question'),
                     CallbackQueryHandler(cancel_order, pattern='cancel_order'),
                     CallbackQueryHandler(handle_order_time_error, pattern='order_time_error'),
-                    CallbackQueryHandler(show_edit_active_orders, pattern='edit_active_orders')
+                    CallbackQueryHandler(show_edit_active_orders, pattern='edit_active_orders'),
+                    CallbackQueryHandler(show_tomorrow_menu, pattern='tomorrow_menu')
                 ],
                 ROOM: [
                     CallbackQueryHandler(ask_name, pattern='^room:[1-6]$'),
@@ -202,11 +203,19 @@ async def main() -> None:
             await application.run_polling(allowed_updates=Update.ALL_TYPES)
 
     except Exception as e:
-        logging.error(f"Произошла ошибка: {e}")
-        sys.exit(1)
+        logging.error(f"Ошибка при запуске бота: {e}")
+        raise
     finally:
+        # Останавливаем задачу обновления статусов
         stop_status_update_task()
-        await application.shutdown()
+        
+        # Останавливаем задачу поддержания активности
+        if 'keep_alive_task' in locals():
+            keep_alive_task.cancel()
+            try:
+                await keep_alive_task
+            except asyncio.CancelledError:
+                pass
 
 def main_sync():
     """Синхронная обертка для запуска асинхронного main()"""

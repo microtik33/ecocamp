@@ -11,7 +11,7 @@ from ..utils.time_utils import is_order_time
 from ..services.auth import is_user_authorized
 
 # Состояния
-PHONE, MENU, ROOM, NAME, MEAL_TYPE, DISH_SELECTION, WISHES, QUESTION, EDIT = range(9)
+PHONE, MENU, ROOM, NAME, MEAL_TYPE, DISH_SELECTION, WISHES, QUESTION, EDIT_ORDER = range(9)
 
 def get_delivery_date(meal_type: str) -> datetime:
     """Определяет дату выдачи заказа. Все заказы создаются на следующий день."""

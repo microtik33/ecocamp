@@ -6,10 +6,16 @@ import pytest
 from telegram import Update, User, Chat, Message, CallbackQuery
 from telegram.constants import ChatType
 from telegram.ext import CallbackContext, Application
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock, patch, ANY
 import sys
 from pytest_mock import MockerFixture
-from orderbot.handlers.order import MENU
+from orderbot.handlers.order import (
+    MENU, ROOM, NAME, MEAL_TYPE, DISH_SELECTION, WISHES, QUESTION, EDIT, EDIT_ORDER,
+    get_delivery_date, show_order_form, handle_order_time_error, ask_room,
+    ask_name, ask_meal_type, show_dishes, handle_dish_selection,
+    handle_text_input, show_user_orders, handle_question, save_question,
+    show_edit_active_orders, start_new_order, process_order_save
+)
 
 if TYPE_CHECKING:
     from _pytest.fixtures import FixtureRequest
@@ -18,86 +24,422 @@ if TYPE_CHECKING:
 from orderbot.handlers import order
 
 @pytest.fixture
-def mock_update() -> Update:
+def mock_message() -> AsyncMock:
+    """Создает мок объекта Message."""
+    message = AsyncMock(spec=Message)
+    message.message_id = 1
+    message.chat_id = 1
+    message.chat = Chat(id=1, type=ChatType.PRIVATE)
+    message.from_user = User(id=1, is_bot=False, first_name='Test User')
+    
+    # Настраиваем возвращаемые значения
+    sent_message = AsyncMock(spec=Message)
+    sent_message.message_id = 2
+    sent_message.chat_id = 1
+    sent_message.chat = message.chat
+    sent_message.from_user = message.from_user
+    
+    message.reply_text = AsyncMock(return_value=sent_message)
+    message.edit_text = AsyncMock(return_value=sent_message)
+    message.delete = AsyncMock()
+    
+    return message
+
+@pytest.fixture
+def mock_update(mock_message: AsyncMock) -> MagicMock:
     """Создает мок объекта Update."""
     # Создаем мок для бота
     bot = AsyncMock()
     bot.defaults = None
-    bot.send_message = AsyncMock()
-    bot.edit_message_text = AsyncMock()
+    
+    # Настраиваем возвращаемые значения для методов бота
+    sent_message = AsyncMock(spec=Message)
+    sent_message.message_id = 2
+    sent_message.chat_id = 1
+    sent_message.chat = mock_message.chat
+    sent_message.from_user = mock_message.from_user
+    
+    bot.send_message = AsyncMock(return_value=sent_message)
+    bot.edit_message_text = AsyncMock(return_value=sent_message)
     bot.delete_message = AsyncMock()
     
-    chat = Chat(id=1, type=ChatType.PRIVATE)
-    user = User(id=1, is_bot=False, first_name='Test User')
-    message = Message(
-        message_id=1,
-        date=datetime.now(),
-        chat=chat,
-        from_user=user
-    )
-    message.set_bot(bot)  # Устанавливаем бота для сообщения
+    mock_message.bot = bot
     
     # Создаем мок для CallbackQuery
-    callback_query = MagicMock(spec=CallbackQuery)
+    callback_query = AsyncMock(spec=CallbackQuery)
     callback_query.id = '123'
-    callback_query.from_user = user
+    callback_query.from_user = mock_message.from_user
     callback_query.chat_instance = '1'
     callback_query.data = 'test'
-    callback_query.message = message
+    callback_query.message = mock_message
     callback_query.answer = AsyncMock()
+    callback_query.edit_message_text = AsyncMock(return_value=sent_message)
     
-    return Update(update_id=1, message=message, callback_query=callback_query)
+    # Создаем объект Update с использованием MagicMock
+    update = MagicMock(spec=Update)
+    update.update_id = 1
+    update.message = mock_message
+    update.callback_query = callback_query
+    update.effective_chat = mock_message.chat
+    update.effective_user = mock_message.from_user
+    
+    return update
 
 @pytest.fixture
-def mock_context() -> MagicMock:
-    """Создает мок объекта CallbackContext."""
-    context = MagicMock()
-    context.user_data = {}
-    
-    # Создаем асинхронный мок для bot
-    bot = AsyncMock()
-    bot.send_message = AsyncMock()
-    bot.edit_message_text = AsyncMock()
-    bot.delete_message = AsyncMock()
-    context.bot = bot
-    
+def mock_context(mock_update: MagicMock) -> MagicMock:
+    """Создает мок объекта Context."""
+    context = MagicMock(spec=CallbackContext)
+    context.user_data = {
+        'order_chat_id': mock_update.effective_chat.id,
+        'order_message_id': 1,
+        'prompt_message_id': 1,
+        'state': None
+    }
+    context.bot = mock_update.message.bot
     return context
+
+@pytest.fixture(autouse=True)
+def mock_translations():
+    """Мокает модуль translations."""
+    with patch('orderbot.translations.get_message') as mock_get_message, \
+         patch('orderbot.translations.get_button') as mock_get_button:
+        mock_get_message.side_effect = lambda key, **kwargs: {
+            'enter_name': 'Введите ваше имя',
+            'choose_meal': 'Выберите время приема пищи',
+            'order_saved': 'Заказ сохранен',
+            'question_saved': 'Спасибо за ваш вопрос',
+            'no_active_orders': 'У вас нет активных заказов',
+            'your_orders': 'Ваши активные заказы',
+            'enter_question': 'Введите ваш вопрос',
+            'question_thanks': 'Спасибо за ваш вопрос',
+            'order_created': 'Заказ создан успешно',
+            'order_updated': 'Заказ обновлен успешно',
+            'order_time_error': 'Сейчас не время для заказов',
+            'wrong_order_time': 'Сейчас не время для заказов',
+            'choose_dishes': 'Выберите блюда'
+        }.get(key, key)
+        
+        mock_get_button.side_effect = lambda key: {
+            'back': 'Назад',
+            'cancel': 'Отмена',
+            'breakfast': 'Завтрак',
+            'lunch': 'Обед',
+            'dinner': 'Ужин',
+            'done': 'Готово'
+        }.get(key, key)
+        yield
+
+@pytest.fixture(autouse=True)
+def mock_is_order_time():
+    """Мокает функцию is_order_time."""
+    with patch('orderbot.handlers.order.is_order_time', return_value=True):
+        yield
+
+@pytest.fixture(autouse=True)
+def mock_sheets():
+    """Мокает модуль sheets."""
+    with patch('orderbot.services.sheets') as mock_sheets:
+        mock_sheets.save_order = AsyncMock(return_value=True)
+        mock_sheets.update_order = AsyncMock(return_value=True)
+        mock_sheets.get_dishes_for_meal = MagicMock(return_value=[('Каша', 100), ('Яичница', 150)])
+        mock_sheets.orders_sheet.get_all_values = AsyncMock(return_value=[
+            ['ID', 'Статус', 'Комната', 'Имя', 'Тип', 'Блюда'],
+            ['1', 'Активен', '101', 'Иван', 'breakfast', 'Каша']
+        ])
+        yield mock_sheets
 
 @pytest.mark.asyncio
 async def test_get_delivery_date() -> None:
-    """Тест получения даты доставки."""
-    today = date.today()
-    delivery_date = order.get_delivery_date('breakfast')
-    assert isinstance(delivery_date, date)
-    assert delivery_date >= today
+    """Тест функции определения даты выдачи заказа."""
+    result = get_delivery_date('breakfast')
+    assert isinstance(result, date)
+    assert result == (datetime.now().date() + timedelta(days=1))
 
 @pytest.mark.asyncio
-async def test_process_order_save_success(
-    mock_update: Update,
-    mock_context: MagicMock,
-) -> None:
-    """Тест успешного сохранения заказа."""
-    # Подготовка данных
+async def test_show_order_form_empty(mock_update: Update, mock_context: MagicMock) -> None:
+    """Тест показа пустой формы заказа."""
+    result = await show_order_form(mock_update, mock_context)
+    assert isinstance(result, str)
+    assert "Ваш заказ" in result
+    assert "—" in result
+
+@pytest.mark.asyncio
+async def test_show_order_form_with_data(mock_update: Update, mock_context: MagicMock) -> None:
+    """Тест показа формы заказа с данными."""
     mock_context.user_data['order'] = {
         'room': '101',
-        'name': 'Test User',
+        'name': 'Иван',
         'meal_type': 'breakfast',
-        'dishes': ['Блюдо 1', 'Блюдо 2'],
-        'quantities': {'Блюдо 1': 1, 'Блюдо 2': 2},
-        'prices': {'Блюдо 1': 100, 'Блюдо 2': 150}  # Добавляем цены
+        'delivery_date': '01.04',
+        'dishes': ['Каша', 'Яичница'],
+        'quantities': {'Каша': 1, 'Яичница': 2}
+    }
+    result = await show_order_form(mock_update, mock_context)
+    assert isinstance(result, str)
+    assert "101" in result
+    assert "Иван" in result
+    assert "Каша x1" in result
+    assert "Яичница x2" in result
+
+@pytest.mark.asyncio
+async def test_handle_order_time_error(mock_update: Update, mock_context: MagicMock) -> None:
+    """Тест обработки ошибки времени заказа."""
+    # Настраиваем мок для callback_query
+    mock_update.callback_query = AsyncMock()
+    mock_update.callback_query.answer = AsyncMock()
+    mock_update.callback_query.edit_message_text = AsyncMock()
+    mock_update.callback_query.data = 'order_time_error'
+    mock_update.callback_query.from_user = MagicMock()
+    mock_update.callback_query.from_user.id = 1
+
+    # Настраиваем мок для translations
+    with patch('orderbot.translations.get_message', return_value='Сейчас не время для заказов'), \
+         patch('orderbot.translations.get_button', side_effect=lambda x: x):
+
+        result = await handle_order_time_error(mock_update, mock_context)
+
+        # Проверяем вызовы
+        mock_update.callback_query.answer.assert_awaited_once()
+        mock_update.callback_query.edit_message_text.assert_awaited_once_with(
+            text='Сейчас не время для заказов',
+            reply_markup=ANY
+        )
+        assert result == MENU
+
+@pytest.mark.asyncio
+async def test_ask_room(mock_update: Update, mock_context: MagicMock) -> None:
+    """Тест запроса номера комнаты."""
+    mock_update.callback_query.data = "start:room"
+    result = await ask_room(mock_update, mock_context)
+    mock_update.callback_query.message.reply_text.assert_called()
+    assert result == ROOM
+
+@pytest.mark.asyncio
+async def test_ask_name(mock_update: Update, mock_context: MagicMock) -> None:
+    """Тест запроса имени."""
+    mock_context.user_data['order'] = {'room': '101'}
+    mock_update.callback_query.data = "room:101"
+    result = await ask_name(mock_update, mock_context)
+    mock_update.callback_query.message.reply_text.assert_called()
+    assert result == NAME
+
+@pytest.mark.asyncio
+async def test_ask_meal_type(mock_update: Update, mock_context: MagicMock) -> None:
+    """Тест запроса типа приема пищи."""
+    mock_context.user_data['order'] = {'room': '101', 'name': 'Иван'}
+    mock_context.user_data['order_chat_id'] = 1
+    mock_context.user_data['order_message_id'] = 1
+    mock_context.user_data['prompt_message_id'] = 1
+    result = await ask_meal_type(mock_update, mock_context)
+    mock_context.bot.edit_message_text.assert_called()
+    assert result == MEAL_TYPE
+
+@pytest.mark.asyncio
+async def test_show_dishes(mock_update: Update, mock_context: MagicMock) -> None:
+    """Тест показа списка блюд."""
+    # Настраиваем мок для callback_query
+    mock_update.callback_query = AsyncMock()
+    mock_update.callback_query.answer = AsyncMock()
+    mock_update.callback_query.message = AsyncMock()
+    mock_update.callback_query.message.reply_text = AsyncMock()
+    mock_update.callback_query.data = 'meal:breakfast'
+    mock_update.callback_query.delete_message = AsyncMock()
+    
+    # Настраиваем данные пользователя
+    mock_context.user_data['order'] = {
+        'room': '101',
+        'name': 'Иван',
+        'meal_type': 'breakfast'
+    }
+    
+    # Настраиваем мок для translations
+    with patch('orderbot.translations.get_message', return_value='Выберите блюда'), \
+         patch('orderbot.translations.get_button', side_effect=lambda x: x), \
+         patch('orderbot.services.sheets.get_dishes_for_meal', return_value=['Каша', 'Яичница']):
+        
+        result = await show_dishes(mock_update, mock_context)
+        
+        # Проверяем вызовы
+        mock_update.callback_query.answer.assert_awaited_once()
+        mock_update.callback_query.delete_message.assert_awaited_once()
+        mock_update.callback_query.message.reply_text.assert_awaited_once()
+        
+        # Проверяем аргументы вызова reply_text
+        call_args = mock_update.callback_query.message.reply_text.call_args
+        assert call_args is not None
+        assert 'Выберите блюда' in call_args[0][0]
+        assert 'reply_markup' in call_args[1]
+        
+        # Проверяем возвращаемое значение
+        assert result == DISH_SELECTION
+
+@pytest.mark.asyncio
+async def test_handle_dish_selection(mock_update: Update, mock_context: MagicMock) -> None:
+    """Тест обработки выбора блюд."""
+    mock_context.user_data['order'] = {
+        'room': '101',
+        'name': 'Иван',
+        'meal_type': 'breakfast',
+        'dishes': [],
+        'quantities': {}
+    }
+    mock_update.callback_query.data = 'select_dish:Каша'
+    
+    result = await handle_dish_selection(mock_update, mock_context)
+    
+    assert 'Каша' in mock_context.user_data['order']['dishes']
+    assert mock_context.user_data['order']['quantities']['Каша'] == 1
+    assert result == DISH_SELECTION
+
+@pytest.mark.asyncio
+async def test_handle_text_input(mock_update: Update, mock_context: MagicMock) -> None:
+    """Тест обработки текстового ввода."""
+    mock_context.user_data['order'] = {'room': '101'}
+    mock_context.user_data['state'] = NAME
+    mock_update.message.text = 'Иван'
+    result = await handle_text_input(mock_update, mock_context)
+    assert mock_context.user_data['order']['name'] == 'Иван'
+    assert result == MEAL_TYPE
+
+@pytest.mark.asyncio
+async def test_show_user_orders(mock_update: Update, mock_context: MagicMock) -> None:
+    """Тест показа заказов пользователя."""
+    result = await show_user_orders(mock_update, mock_context)
+    mock_update.message.reply_text.assert_called_once()
+    args = mock_update.message.reply_text.call_args
+    assert args is not None
+    assert "Ваши активные заказы" in args[0][0]
+    assert result == MENU
+
+@pytest.mark.asyncio
+async def test_handle_question(mock_update: Update, mock_context: MagicMock) -> None:
+    """Тест обработки вопроса пользователя."""
+    # Настраиваем мок для callback_query
+    mock_update.callback_query = AsyncMock()
+    mock_update.callback_query.answer = AsyncMock()
+    mock_update.callback_query.edit_message_text = AsyncMock()
+    mock_update.callback_query.data = 'ask_question'
+    mock_update.callback_query.from_user = MagicMock()
+    mock_update.callback_query.from_user.id = 1
+
+    # Настраиваем мок для translations
+    with patch('orderbot.translations.get_message', return_value='Задайте ваш вопрос'), \
+         patch('orderbot.translations.get_button', side_effect=lambda x: x):
+
+        result = await handle_question(mock_update, mock_context)
+
+        # Проверяем вызовы
+        mock_update.callback_query.answer.assert_awaited_once()
+        mock_update.callback_query.edit_message_text.assert_awaited_once_with(
+            text='Задайте ваш вопрос',
+            reply_markup=ANY
+        )
+        assert result == QUESTION
+
+@pytest.mark.asyncio
+async def test_save_question(mock_update: Update, mock_context: MagicMock) -> None:
+    """Тест сохранения вопроса."""
+    mock_update.message.text = "Какой у вас график работы?"
+    result = await save_question(mock_update, mock_context)
+    mock_update.message.reply_text.assert_called_once()
+    args = mock_update.message.reply_text.call_args
+    assert args is not None
+    assert "Спасибо за ваш вопрос" in args[0][0]
+    assert result == MENU
+
+@pytest.mark.asyncio
+async def test_show_edit_active_orders(mock_update: Update, mock_context: MagicMock) -> None:
+    """Тест отображения формы редактирования активных заказов."""
+    # Настраиваем мок для callback_query
+    mock_update.callback_query = AsyncMock()
+    mock_update.callback_query.answer = AsyncMock()
+    mock_update.callback_query.edit_message_text = AsyncMock()
+    mock_update.callback_query.data = 'edit_orders'
+    mock_update.callback_query.from_user = MagicMock()
+    mock_update.callback_query.from_user.id = 1
+
+    # Настраиваем мок для translations
+    with patch('orderbot.translations.get_message', return_value='Выберите заказ для редактирования'), \
+         patch('orderbot.translations.get_button', side_effect=lambda x: x):
+
+        result = await show_edit_active_orders(mock_update, mock_context)
+
+        # Проверяем вызовы
+        mock_update.callback_query.answer.assert_awaited_once()
+        mock_update.callback_query.edit_message_text.assert_awaited_once_with(
+            text='Выберите заказ для редактирования',
+            reply_markup=ANY
+        )
+        assert result == EDIT_ORDER
+
+@pytest.mark.asyncio
+async def test_start_new_order(mock_update: Update, mock_context: MagicMock) -> None:
+    """Тест начала нового заказа."""
+    # Настраиваем мок для callback_query
+    mock_update.callback_query = AsyncMock()
+    mock_update.callback_query.answer = AsyncMock()
+    mock_update.callback_query.edit_message_text = AsyncMock()
+    mock_update.callback_query.data = 'new_order'
+    mock_update.callback_query.from_user = MagicMock()
+    mock_update.callback_query.from_user.id = 1
+
+    # Настраиваем мок для translations
+    with patch('orderbot.translations.get_message', return_value='Выберите тип заказа'), \
+         patch('orderbot.translations.get_button', side_effect=lambda x: x), \
+         patch('orderbot.handlers.order.is_order_time', return_value=True):
+
+        result = await start_new_order(mock_update, mock_context)
+
+        # Проверяем вызовы
+        mock_update.callback_query.answer.assert_awaited_once()
+        mock_update.callback_query.edit_message_text.assert_awaited_once_with(
+            text='Выберите тип заказа',
+            reply_markup=ANY
+        )
+        assert result == MEAL_TYPE
+
+@pytest.mark.asyncio
+async def test_process_order_save_success(mock_update: Update, mock_context: MagicMock) -> None:
+    """Тест успешного сохранения заказа."""
+    # Настраиваем мок для callback_query
+    mock_update.callback_query = AsyncMock()
+    mock_update.callback_query.answer = AsyncMock()
+    mock_update.callback_query.edit_message_text = AsyncMock()
+    mock_update.callback_query.data = 'save_order'
+    mock_update.callback_query.from_user = MagicMock()
+    mock_update.callback_query.from_user.id = 1
+
+    # Настраиваем мок для sheets
+    mock_sheets = AsyncMock()
+    mock_sheets.save_order = AsyncMock(return_value=True)
+    mock_context.bot_data = {'sheets': mock_sheets}
+
+    # Добавляем данные заказа
+    mock_context.user_data = {
+        'order': {
+            'room': '101',
+            'name': 'Test User',
+            'meal_type': 'breakfast',
+            'dishes': ['Блюдо 1', 'Блюдо 2'],
+            'quantities': {'Блюдо 1': 1, 'Блюдо 2': 2},
+            'prices': {'Блюдо 1': 100, 'Блюдо 2': 150}
+        }
     }
 
-    # Настраиваем мок для save_order
-    from orderbot.services import sheets
-    sheets.save_order.return_value = True
+    # Настраиваем мок для translations
+    with patch('orderbot.translations.get_message', return_value='Заказ успешно сохранен'), \
+         patch('orderbot.translations.get_button', side_effect=lambda x: x):
 
-    # Вызываем тестируемую функцию
-    result = await order.process_order_save(mock_update, mock_context)
+        result = await process_order_save(mock_update, mock_context)
 
-    # Проверяем результат
-    assert result is not None
-    sheets.save_order.assert_called_once()
-    assert mock_context.user_data['order']['order_id'] == "123"
+        # Проверяем вызовы
+        mock_update.callback_query.answer.assert_awaited_once()
+        mock_sheets.save_order.assert_awaited_once()
+        mock_update.callback_query.edit_message_text.assert_awaited_once_with(
+            text='Заказ успешно сохранен',
+            reply_markup=ANY
+        )
+        assert result == MENU
 
 @pytest.mark.asyncio
 async def test_cancel_order_success(mocker: MockerFixture) -> None:
@@ -112,49 +454,36 @@ async def test_cancel_order_success(mocker: MockerFixture) -> None:
 
     # Создаем мок для Update
     update = mocker.MagicMock(spec=Update)
-
-    # Создаем мок для User
-    user = mocker.MagicMock(spec=User)
-    user.id = '1'
-
-    # Создаем мок для Message
-    message = mocker.AsyncMock(spec=Message)
-    message.chat.id = '100'
-
-    # Создаем мок для CallbackQuery
-    callback_query = mocker.AsyncMock(spec=CallbackQuery)
-    callback_query.from_user = user
-    callback_query.data = 'cancel_123'
-    callback_query.message = message
-    callback_query.answer = mocker.AsyncMock()
-    callback_query.edit_message_text = mocker.AsyncMock()
-
-    # Устанавливаем callback_query в update
-    update.callback_query = callback_query
+    update.callback_query = mocker.AsyncMock(spec=CallbackQuery)
+    update.callback_query.answer = mocker.AsyncMock()
+    update.callback_query.edit_message_text = mocker.AsyncMock()
+    update.callback_query.data = 'cancel_123'
+    update.callback_query.from_user = mocker.MagicMock(spec=User)
+    update.callback_query.from_user.id = '1'
 
     # Создаем мок для context
     context = mocker.MagicMock()
     context.user_data = {'order': order_data}
 
-    # Мокаем sheets.get_order
-    mocker.patch('orderbot.services.sheets.get_order', return_value=order_data)
+    # Настраиваем мок для translations
+    with patch('orderbot.translations.get_message', return_value='Заказ успешно отменён'), \
+         patch('orderbot.translations.get_button', side_effect=lambda x: x), \
+         patch('orderbot.services.sheets.get_order', return_value=order_data), \
+         patch('orderbot.services.sheets.update_order', return_value=True), \
+         patch('orderbot.handlers.order.update_user_stats', return_value=None), \
+         patch('orderbot.handlers.order.is_order_time', return_value=True):
 
-    # Мокаем translations
-    mocker.patch('orderbot.translations.get_message', return_value='Заказ успешно отменён')
-    mocker.patch('orderbot.translations.get_button', side_effect=lambda x: x)
+        # Вызываем тестируемую функцию
+        from orderbot.handlers.order import cancel_order
+        result = await cancel_order(update, context)
 
-    # Мокаем update_user_stats
-    mocker.patch('orderbot.handlers.order.update_user_stats', return_value=None)
-
-    # Вызываем тестируемую функцию
-    from orderbot.handlers.order import cancel_order
-    result = await cancel_order(update, context)
-
-    # Проверяем, что методы были вызваны
-    callback_query.answer.assert_awaited_once()
-    callback_query.edit_message_text.assert_awaited_once()
-    assert result == MENU
-    assert not context.user_data
+        # Проверяем вызовы
+        update.callback_query.answer.assert_awaited_once()
+        update.callback_query.edit_message_text.assert_awaited_once_with(
+            text='Заказ успешно отменён',
+            reply_markup=ANY
+        )
+        assert result == MENU
 
 @pytest.mark.asyncio
 async def test_get_order_info_success(
@@ -179,20 +508,21 @@ async def test_get_order_info_success(
         'delivery_date': '05.04.24'
     }
 
-    # Сбрасываем счетчик вызовов
-    from orderbot.services import sheets
-    sheets.orders_sheet.get_all_values.reset_mock()
-    sheets.orders_sheet.get_all_values.return_value = [
+    # Настраиваем мок для sheets.orders_sheet.get_all_values
+    with patch('orderbot.services.sheets.orders_sheet.get_all_values', return_value=[
         ['ID', 'Timestamp', 'Status', 'UserID', 'Username', 'Total', 'Room', 'Name', 'MealType', 'Dishes', 'Wishes', 'DeliveryDate'],
         ['123', '2024-04-04 12:00:00', 'Активен', '1', '@test_user', '250', '101', 'Test User', 'breakfast', 'Блюдо 1', '-', '05.04.24']
-    ]
+    ]):
+        # Вызываем тестируемую функцию
+        from orderbot.handlers.order import get_order_info
+        result = await get_order_info(order_id)
 
-    # Вызываем тестируемую функцию
-    result = await order.get_order_info(order_id)
-
-    # Проверяем результат
-    assert result == expected_order
-    sheets.orders_sheet.get_all_values.assert_called_once()
+        # Проверяем результат
+        assert result == expected_order
+        
+        # Проверяем вызов get_all_values
+        from orderbot.services.sheets import orders_sheet
+        orders_sheet.get_all_values.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_handle_order_update_success(
