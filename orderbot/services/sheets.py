@@ -274,9 +274,14 @@ async def update_user_stats(user_id: str):
         
         for order in all_orders[1:]:  # Пропускаем заголовок
             if order[3] == user_id:  # User ID в четвертом столбце
-                order_date = order[1]  # Дата заказа во втором столбце
-                if not last_order_date or order_date > last_order_date:
-                    last_order_date = order_date
+                try:
+                    # Парсим дату из формата DD.MM.YYYY HH:MM:SS
+                    order_date = datetime.strptime(order[1], "%d.%m.%Y %H:%M:%S")
+                    if not last_order_date or order_date > last_order_date:
+                        last_order_date = order_date
+                except ValueError:
+                    print(f"Ошибка парсинга даты заказа: {order[1]}")
+                    continue
                 
                 if order[2] == 'Активен':  # Статус в третьем столбце
                     active_orders += 1
@@ -285,7 +290,8 @@ async def update_user_stats(user_id: str):
                     cancelled_orders += 1
         
         # Получаем текущие данные пользователя
-        users_data = get_users_sheet().get_all_values()
+        users_sheet = get_users_sheet()
+        users_data = users_sheet.get_all_values()
         user_row = None
         for idx, row in enumerate(users_data):
             if row[0] == user_id:
@@ -293,13 +299,18 @@ async def update_user_stats(user_id: str):
                 break
         
         if user_row:
-            # Обновляем существующую запись (столбцы F-I, индексы 5-8)
-            get_users_sheet().update(f'F{user_row}:I{user_row}', 
+            # Форматируем дату последнего заказа
+            formatted_date = last_order_date.strftime("%d.%m.%Y %H:%M:%S") if last_order_date else ''
+            
+            # Обновляем статистику пользователя
+            # F-I столбцы (индексы 5-8): Orders Count, Cancellations, Total Sum, Last Order Date
+            users_sheet.update(f'F{user_row}:I{user_row}', 
                              [[str(active_orders), 
                                str(cancelled_orders), 
                                str(int(total_sum)),
-                               last_order_date or '']],
+                               formatted_date]],
                              value_input_option='USER_ENTERED')
+            print(f"Обновлена статистика пользователя {user_id}: {active_orders} активных заказов, {cancelled_orders} отмен, сумма {total_sum}, последний заказ {formatted_date}")
         
         return True
     except Exception as e:
