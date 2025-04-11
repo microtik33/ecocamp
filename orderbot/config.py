@@ -30,6 +30,3 @@ GOOGLE_SHEETS_SCOPE = [
 ]
 MENU_SHEET_NAME = os.getenv('MENU_SHEET_NAME', 'HotelMenu')
 ORDERS_SHEET_NAME = os.getenv('ORDERS_SHEET_NAME', 'HotelOrders')
-
-# Другие настройки (если нужно)
-REMINDER_TIME = "20:00"

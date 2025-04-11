@@ -35,14 +35,22 @@ def get_orders_sheet():
 def get_users_sheet():
     """Получение листа пользователей."""
     try:
-        return spreadsheet.get_worksheet_by_id(USERS_SHEET_ID)
-    except gspread.WorksheetNotFound:
+        print(f"Пытаемся получить лист пользователей по ID: {USERS_SHEET_ID}")
+        sheet = spreadsheet.get_worksheet_by_id(USERS_SHEET_ID)
+        print(f"Успешно получен лист: {sheet.title}")
+        return sheet
+    except gspread.WorksheetNotFound as e:
+        print(f"Лист не найден: {e}")
+        print("Создаем новый лист Users")
         sheet = spreadsheet.add_worksheet("Users", 1000, 10)
         sheet.update('A1:J1', [['User ID', 'Profile Link', 'First Name', 
                               'Last Name', 'Phone Number', 'Start Time',
                               'Orders Count', 'Cancellations', 
                               'Total Sum', 'Last Order Date']])
         return sheet
+    except Exception as e:
+        print(f"Неожиданная ошибка при получении листа пользователей: {e}")
+        raise
 
 def get_kitchen_sheet():
     """Получение листа кухни."""
@@ -209,30 +217,43 @@ async def save_user_info(user_info: dict):
         username = user_info.get('username', '-')
         profile_link = f"t.me/{username}" if username != '-' else '-'
         
+        print(f"Сохраняем информацию о пользователе {user_id}")
+        
         # Проверяем, существует ли пользователь
-        users_data = get_users_sheet().get_all_values()
+        users_sheet = get_users_sheet()
+        users_data = users_sheet.get_all_values()
+        print(f"Получено {len(users_data)} строк из листа пользователей")
+        
         user_exists = False
         for idx, row in enumerate(users_data):
             if row[0] == user_id:
+                print(f"Найден существующий пользователь в строке {idx + 1}")
                 # Обновляем существующего пользователя
-                get_users_sheet().update(f'A{idx+1}:C{idx+1}', 
-                                 [[user_id, username, profile_link]],
+                users_sheet.update(f'A{idx+1}:C{idx+1}', 
+                                 [[user_id, profile_link, username]],
                                  value_input_option='USER_ENTERED')
                 user_exists = True
+                print("Информация о пользователе обновлена")
                 break
         
         if not user_exists:
+            print("Создаем новую запись о пользователе")
             # Добавляем нового пользователя
             new_user_row = [
                 user_id,
-                username,
                 profile_link,
+                username,
+                '-',  # First Name
+                '-',  # Last Name
+                '',   # Phone Number
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),  # Start Time
                 '0',  # Orders Count
                 '0',  # Cancellations
                 '0',  # Total Sum
                 ''    # Last Order Date
             ]
-            get_users_sheet().append_row(new_user_row, value_input_option='USER_ENTERED')
+            users_sheet.append_row(new_user_row, value_input_option='USER_ENTERED')
+            print("Новый пользователь добавлен")
         
         return True
     except Exception as e:
