@@ -13,54 +13,68 @@ client = gspread.service_account(filename=config.GOOGLE_CREDENTIALS_FILE)
 # Открываем таблицу заказов
 spreadsheet = client.open(config.ORDERS_SHEET_NAME)
 
-# Получаем или создаем лист с заказами
-try:
-    orders_sheet = spreadsheet.get_worksheet_by_id(2082646960)
-except gspread.WorksheetNotFound:
-    orders_sheet = spreadsheet.add_worksheet("Orders", 1000, 12)  # Увеличиваем до 12 столбцов
-    # Добавляем заголовки
-    orders_sheet.update('A1:L1', [['ID заказа', 'Время', 'Статус', 'User ID', 'Username',
-                                 'Сумма заказа', 'Номер комнаты', 'Имя',
-                                 'Тип еды', 'Блюда', 'Пожелания', 'Дата выдачи']])
+# ID листов
+ORDERS_SHEET_ID = 2082646960
+USERS_SHEET_ID = 505696272
+KITCHEN_SHEET_ID = 2090492372
+REC_SHEET_ID = 1331625926
+AUTH_SHEET_ID = 66851994
+MENU_SHEET_ID = 1808438200
 
-# Получаем или создаем лист с пользователями
-try:
-    users_sheet = spreadsheet.get_worksheet_by_id(505696272)
-except gspread.WorksheetNotFound:
-    users_sheet = spreadsheet.add_worksheet("Users", 1000, 10)
-    # Добавляем заголовки
-    users_sheet.update('A1:J1', [['User ID', 'Profile Link', 'First Name', 
-                                 'Last Name', 'Phone Number', 'Start Time',
-                                 'Orders Count', 'Cancellations', 
-                                 'Total Sum', 'Last Order Date']])
+def get_orders_sheet():
+    """Получение листа заказов."""
+    try:
+        return spreadsheet.get_worksheet_by_id(ORDERS_SHEET_ID)
+    except gspread.WorksheetNotFound:
+        sheet = spreadsheet.add_worksheet("Orders", 1000, 12)
+        sheet.update('A1:L1', [['ID заказа', 'Время', 'Статус', 'User ID', 'Username',
+                              'Сумма заказа', 'Номер комнаты', 'Имя',
+                              'Тип еды', 'Блюда', 'Пожелания', 'Дата выдачи']])
+        return sheet
 
-# Получаем или создаем лист с поварами
-try:
-    kitchen_sheet = spreadsheet.get_worksheet_by_id(2090492372)
-except gspread.WorksheetNotFound:
-    kitchen_sheet = spreadsheet.add_worksheet("Kitchen", 100, 1)
-    # Добавляем заголовок
-    kitchen_sheet.update('A1', [['User ID']])
+def get_users_sheet():
+    """Получение листа пользователей."""
+    try:
+        return spreadsheet.get_worksheet_by_id(USERS_SHEET_ID)
+    except gspread.WorksheetNotFound:
+        sheet = spreadsheet.add_worksheet("Users", 1000, 10)
+        sheet.update('A1:J1', [['User ID', 'Profile Link', 'First Name', 
+                              'Last Name', 'Phone Number', 'Start Time',
+                              'Orders Count', 'Cancellations', 
+                              'Total Sum', 'Last Order Date']])
+        return sheet
 
-# Получаем или создаем лист с записями
-try:
-    rec_sheet = spreadsheet.get_worksheet_by_id(1331625926)
-except gspread.WorksheetNotFound:
-    rec_sheet = spreadsheet.add_worksheet("Rec", 1000, 6)
-    # Добавляем заголовки
-    rec_sheet.update('A1:F1', [['Дата', 'Количество заказов', 'Общая сумма', 
-                               'Средний чек', 'Количество отмен', 'Процент отмен']])
+def get_kitchen_sheet():
+    """Получение листа кухни."""
+    try:
+        return spreadsheet.get_worksheet_by_id(KITCHEN_SHEET_ID)
+    except gspread.WorksheetNotFound:
+        sheet = spreadsheet.add_worksheet("Kitchen", 100, 1)
+        sheet.update('A1', [['User ID']])
+        return sheet
 
-# Получаем или создаем лист с авторизацией
-try:
-    auth_sheet = spreadsheet.get_worksheet_by_id(66851994)
-except gspread.WorksheetNotFound:
-    auth_sheet = spreadsheet.add_worksheet("Auth", 1000, 3)
-    # Добавляем заголовки
-    auth_sheet.update('A1:C1', [['User ID', 'Auth Token', 'Expiry Date']])
+def get_rec_sheet():
+    """Получение листа записей."""
+    try:
+        return spreadsheet.get_worksheet_by_id(REC_SHEET_ID)
+    except gspread.WorksheetNotFound:
+        sheet = spreadsheet.add_worksheet("Rec", 1000, 6)
+        sheet.update('A1:F1', [['Дата', 'Количество заказов', 'Общая сумма', 
+                              'Средний чек', 'Количество отмен', 'Процент отмен']])
+        return sheet
 
-# Открываем таблицу с меню
-menu_sheet = client.open(config.MENU_SHEET_NAME).get_worksheet_by_id(1808438200)
+def get_auth_sheet():
+    """Получение листа авторизации."""
+    try:
+        return spreadsheet.get_worksheet_by_id(AUTH_SHEET_ID)
+    except gspread.WorksheetNotFound:
+        sheet = spreadsheet.add_worksheet("Auth", 1000, 3)
+        sheet.update('A1:C1', [['User ID', 'Auth Token', 'Expiry Date']])
+        return sheet
+
+def get_menu_sheet():
+    """Получение листа меню."""
+    return client.open(config.MENU_SHEET_NAME).get_worksheet_by_id(MENU_SHEET_ID)
 
 # Кэш для меню
 _menu_cache: Dict[str, List[Tuple[str, str]]] = {}
@@ -80,6 +94,7 @@ def _update_menu_cache():
             'dinner': (5, 6)      # E и F столбцы
         }
         
+        menu_sheet = get_menu_sheet()
         for meal_type, (dish_col, price_col) in column_map.items():
             dishes = menu_sheet.col_values(dish_col)[1:]
             prices = menu_sheet.col_values(price_col)[1:]
@@ -98,45 +113,12 @@ def get_next_order_id():
     
     Returns:
         str: Следующий доступный ID заказа.
-        
-    Алгоритм:
-    1. Получает все существующие ID заказов
-    2. Находит максимальный ID среди существующих
-    3. Возвращает следующий по порядку ID
-    4. В случае ошибок использует timestamp как запасной вариант
     """
-    try:
-        # Получаем все значения из первого столбца (ID заказов)
-        all_ids = orders_sheet.col_values(1)
-        
-        if len(all_ids) <= 1:  # Если таблица пустая или содержит только заголовок
-            return "1"
-        
-        # Пропускаем заголовок, фильтруем только числовые ID и преобразуем в целые числа
-        valid_ids = []
-        for id_str in all_ids[1:]:  # Пропускаем заголовок
-            try:
-                valid_ids.append(int(id_str))
-            except (ValueError, TypeError):
-                continue
-        
-        if not valid_ids:  # Если нет валидных ID
-            return "1"
-        
-        # Находим максимальный ID и добавляем 1
-        next_id = max(valid_ids) + 1
-        
-        # Проверяем, что такого ID еще нет в таблице
-        while str(next_id) in all_ids:
-            next_id += 1
-        
-        return str(next_id)
-        
-    except Exception as e:
-        # В случае ошибки используем timestamp как запасной вариант
-        print(f"Ошибка при генерации ID заказа: {e}")
-        timestamp_id = int(datetime.now().timestamp())
-        return str(timestamp_id)
+    orders_sheet = get_orders_sheet()
+    all_orders = orders_sheet.get_all_values()
+    if len(all_orders) <= 1:
+        return "1"
+    return str(int(all_orders[-1][0]) + 1)
 
 async def save_order(order_data):
     """Сохраняет новый заказ в таблицу."""
@@ -176,7 +158,7 @@ async def update_order(order_id, row_index, order_data):
     """Обновляет существующий заказ в таблице."""
     try:
         # Получаем текущие данные заказа
-        current_order = orders_sheet.row_values(row_index)
+        current_order = get_orders_sheet().row_values(row_index)
         
         # Обновляем только те поля, которые переданы в order_data
         if 'status' in order_data:
@@ -195,7 +177,7 @@ async def update_order(order_id, row_index, order_data):
             current_order[11] = order_data['delivery_date']
         
         # Обновляем строку в таблице с value_input_option='USER_ENTERED'
-        orders_sheet.update(f'A{row_index}:L{row_index}', [current_order], value_input_option='USER_ENTERED')
+        get_orders_sheet().update(f'A{row_index}:L{row_index}', [current_order], value_input_option='USER_ENTERED')
         return True
         
     except Exception as e:
@@ -205,7 +187,7 @@ async def update_order(order_id, row_index, order_data):
 async def get_user_orders(user_id: str) -> List[List[str]]:
     """Получение всех активных заказов пользователя."""
     try:
-        all_orders = orders_sheet.get_all_values()
+        all_orders = get_orders_sheet().get_all_values()
         return [row for row in all_orders[1:] if row[3] == user_id and row[2] == 'Активен']
     except Exception as e:
         print(f"Ошибка при получении заказов пользователя: {e}")
@@ -214,7 +196,7 @@ async def get_user_orders(user_id: str) -> List[List[str]]:
 async def update_order_status(order_id: str, row_idx: int, status: str) -> bool:
     """Обновление статуса заказа."""
     try:
-        orders_sheet.update_cell(row_idx, 3, status)  # Колонка C содержит статус
+        get_orders_sheet().update_cell(row_idx, 3, status)  # Колонка C содержит статус
         return True
     except Exception as e:
         print(f"Ошибка при обновлении статуса заказа: {e}")
@@ -228,12 +210,12 @@ async def save_user_info(user_info: dict):
         profile_link = f"t.me/{username}" if username != '-' else '-'
         
         # Проверяем, существует ли пользователь
-        users_data = users_sheet.get_all_values()
+        users_data = get_users_sheet().get_all_values()
         user_exists = False
         for idx, row in enumerate(users_data):
             if row[0] == user_id:
                 # Обновляем существующего пользователя
-                users_sheet.update(f'A{idx+1}:C{idx+1}', 
+                get_users_sheet().update(f'A{idx+1}:C{idx+1}', 
                                  [[user_id, username, profile_link]],
                                  value_input_option='USER_ENTERED')
                 user_exists = True
@@ -250,7 +232,7 @@ async def save_user_info(user_info: dict):
                 '0',  # Total Sum
                 ''    # Last Order Date
             ]
-            users_sheet.append_row(new_user_row, value_input_option='USER_ENTERED')
+            get_users_sheet().append_row(new_user_row, value_input_option='USER_ENTERED')
         
         return True
     except Exception as e:
@@ -261,7 +243,7 @@ async def update_user_stats(user_id: str):
     """Обновление статистики пользователя."""
     try:
         # Получаем все заказы
-        all_orders = orders_sheet.get_all_values()
+        all_orders = get_orders_sheet().get_all_values()
         
         # Подсчитываем статистику пользователя
         active_orders = 0
@@ -282,7 +264,7 @@ async def update_user_stats(user_id: str):
                     cancelled_orders += 1
         
         # Получаем текущие данные пользователя
-        users_data = users_sheet.get_all_values()
+        users_data = get_users_sheet().get_all_values()
         user_row = None
         for idx, row in enumerate(users_data):
             if row[0] == user_id:
@@ -291,7 +273,7 @@ async def update_user_stats(user_id: str):
         
         if user_row:
             # Обновляем существующую запись (столбцы F-I, индексы 5-8)
-            users_sheet.update(f'F{user_row}:I{user_row}', 
+            get_users_sheet().update(f'F{user_row}:I{user_row}', 
                              [[str(active_orders), 
                                str(cancelled_orders), 
                                str(int(total_sum)),
@@ -306,7 +288,7 @@ async def update_user_stats(user_id: str):
 async def get_user_stats(user_id: str):
     """Получение статистики пользователя."""
     try:
-        users_data = users_sheet.get_all_values()
+        users_data = get_users_sheet().get_all_values()
         for row in users_data[1:]:  # Пропускаем заголовок
             if row[0] == user_id:
                 return {
@@ -324,7 +306,7 @@ def is_user_cook(user_id: str) -> bool:
     """Проверяет, является ли пользователь поваром."""
     try:
         # Получаем все ID поваров из первого столбца
-        cook_ids = kitchen_sheet.col_values(1)
+        cook_ids = get_kitchen_sheet().col_values(1)
         return str(user_id) in cook_ids
     except Exception as e:
         print(f"Ошибка при проверке доступа повара: {e}")
@@ -343,7 +325,7 @@ async def update_orders_status():
     """Обновляет статусы заказов после полуночи."""
     try:
         # Получаем все заказы
-        all_orders = orders_sheet.get_all_values()
+        all_orders = get_orders_sheet().get_all_values()
         today = datetime.now().date()
         
         # Создаем список для пакетного обновления
@@ -401,7 +383,7 @@ async def update_orders_status():
             
             # Выполняем пакетное обновление
             for range_name, values in ranges:
-                orders_sheet.update(range_name, values, value_input_option='USER_ENTERED')
+                get_orders_sheet().update(range_name, values, value_input_option='USER_ENTERED')
         
         return True
     except Exception as e:
@@ -421,6 +403,6 @@ def get_credentials():
     return 'credentials.json'  # Для локальной разработки
 
 # Инициализация листов
-orders_sheet = spreadsheet.worksheet("Orders")
-users_sheet = spreadsheet.worksheet("Users")
-rec_sheet = spreadsheet.worksheet("Rec")
+orders_sheet = get_orders_sheet()
+users_sheet = get_users_sheet()
+rec_sheet = get_rec_sheet()

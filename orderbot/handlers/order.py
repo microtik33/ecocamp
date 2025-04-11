@@ -537,6 +537,8 @@ async def process_order_save(update: telegram.Update, context: telegram.ext.Cont
         success = await save_order(order_data)
     else:
         # Получаем все заказы и ищем нужный для обновления
+        from orderbot.services.sheets import get_orders_sheet
+        orders_sheet = get_orders_sheet()
         all_orders = orders_sheet.get_all_values()
         order_found = False
         
@@ -677,6 +679,8 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
     if 'state' not in context.user_data:
         context.user_data['state'] = MENU
     
+    from orderbot.services.sheets import get_orders_sheet
+    orders_sheet = get_orders_sheet()
     all_orders = orders_sheet.get_all_values()
     # Фильтруем заказы пользователя со статусами "Принят" и "Активен"
     user_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] in ['Принят', 'Активен']]
@@ -860,8 +864,9 @@ async def cancel_order(update: telegram.Update, context: telegram.ext.ContextTyp
     
     try:
         # Получаем все заказы и ищем нужный для отмены
-        from ..services import sheets
-        all_orders = sheets.orders_sheet.get_all_values()
+        from orderbot.services.sheets import get_orders_sheet
+        orders_sheet = get_orders_sheet()
+        all_orders = orders_sheet.get_all_values()
         order_found = False
         
         for idx, row in enumerate(all_orders):
@@ -871,7 +876,7 @@ async def cancel_order(update: telegram.Update, context: telegram.ext.ContextTyp
                 
                 # Меняем статус заказа на "Отменён" (учитываем, что индексы в таблице начинаются с 1)
                 # Колонка C (индекс 2) содержит статус заказа
-                sheets.orders_sheet.update_cell(idx + 1, 3, 'Отменён')
+                orders_sheet.update_cell(idx + 1, 3, 'Отменён')
                 order_found = True
                 break
         
@@ -908,6 +913,8 @@ async def cancel_order(update: telegram.Update, context: telegram.ext.ContextTyp
 
 async def get_order_info(order_id: str) -> dict:
     """Получение информации о заказе из таблицы."""
+    from orderbot.services.sheets import get_orders_sheet
+    orders_sheet = get_orders_sheet()
     all_orders = orders_sheet.get_all_values()
     for row in all_orders[1:]:  # Пропускаем заголовок
         if row[0] == order_id:
@@ -1019,6 +1026,8 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
         
         try:
             # Получаем все заказы и ищем нужный для отмены
+            from orderbot.services.sheets import get_orders_sheet
+            orders_sheet = get_orders_sheet()
             all_orders = orders_sheet.get_all_values()
             order_found = False
             
@@ -1165,10 +1174,9 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
         # Удаляем информационное сообщение о заказе
         try:
             if context.user_data.get('order_message_id'):
-                await context.bot.delete_message(
-                    chat_id=context.user_data['order_chat_id'],
-                    message_id=context.user_data['order_message_id']
-                )
+                from orderbot.services.sheets import get_orders_sheet
+                orders_sheet = get_orders_sheet()
+                orders_sheet.delete_row(context.user_data['order_message_id'])
         except Exception as e:
             print(f"Ошибка при удалении сообщения о заказе: {e}")
             
@@ -1215,6 +1223,8 @@ async def show_edit_active_orders(update: telegram.Update, context: telegram.ext
     await query.answer()
     
     user_id = str(update.effective_user.id)
+    from orderbot.services.sheets import get_orders_sheet
+    orders_sheet = get_orders_sheet()
     all_orders = orders_sheet.get_all_values()
     # Фильтруем только активные заказы пользователя
     active_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] == 'Активен']
