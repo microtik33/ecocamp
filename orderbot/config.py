@@ -28,5 +28,5 @@ GOOGLE_SHEETS_SCOPE = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
-MENU_SHEET_NAME = os.getenv('MENU_SHEET_NAME', 'HotelMenu')
-ORDERS_SHEET_NAME = os.getenv('ORDERS_SHEET_NAME', 'HotelOrders')
+MENU_SHEET_NAME = os.getenv('MENU_SHEET_NAME')
+ORDERS_SHEET_NAME = os.getenv('ORDERS_SHEET_NAME')
