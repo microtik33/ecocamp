@@ -15,7 +15,7 @@ spreadsheet = client.open(config.ORDERS_SHEET_NAME)
 
 # Получаем или создаем лист с заказами
 try:
-    orders_sheet = spreadsheet.worksheet("Orders")
+    orders_sheet = spreadsheet.get_worksheet_by_id(2082646960)
 except gspread.WorksheetNotFound:
     orders_sheet = spreadsheet.add_worksheet("Orders", 1000, 12)  # Увеличиваем до 12 столбцов
     # Добавляем заголовки
@@ -25,7 +25,7 @@ except gspread.WorksheetNotFound:
 
 # Получаем или создаем лист с пользователями
 try:
-    users_sheet = spreadsheet.worksheet("Users")
+    users_sheet = spreadsheet.get_worksheet_by_id(505696272)
 except gspread.WorksheetNotFound:
     users_sheet = spreadsheet.add_worksheet("Users", 1000, 10)
     # Добавляем заголовки
@@ -36,7 +36,7 @@ except gspread.WorksheetNotFound:
 
 # Получаем или создаем лист с поварами
 try:
-    kitchen_sheet = spreadsheet.worksheet("Kitchen")
+    kitchen_sheet = spreadsheet.get_worksheet_by_id(2090492372)
 except gspread.WorksheetNotFound:
     kitchen_sheet = spreadsheet.add_worksheet("Kitchen", 100, 1)
     # Добавляем заголовок
@@ -44,7 +44,7 @@ except gspread.WorksheetNotFound:
 
 # Получаем или создаем лист с записями
 try:
-    rec_sheet = spreadsheet.worksheet("Rec")
+    rec_sheet = spreadsheet.get_worksheet_by_id(1331625926)
 except gspread.WorksheetNotFound:
     rec_sheet = spreadsheet.add_worksheet("Rec", 1000, 6)
     # Добавляем заголовки
@@ -53,14 +53,14 @@ except gspread.WorksheetNotFound:
 
 # Получаем или создаем лист с авторизацией
 try:
-    auth_sheet = spreadsheet.worksheet("Auth")
+    auth_sheet = spreadsheet.get_worksheet_by_id(66851994)
 except gspread.WorksheetNotFound:
     auth_sheet = spreadsheet.add_worksheet("Auth", 1000, 3)
     # Добавляем заголовки
     auth_sheet.update('A1:C1', [['User ID', 'Auth Token', 'Expiry Date']])
 
 # Открываем таблицу с меню
-menu_sheet = client.open(config.MENU_SHEET_NAME).sheet1
+menu_sheet = client.open(config.MENU_SHEET_NAME).get_worksheet_by_id(1808438200)
 
 # Кэш для меню
 _menu_cache: Dict[str, List[Tuple[str, str]]] = {}

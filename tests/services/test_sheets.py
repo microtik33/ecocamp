@@ -37,9 +37,12 @@ def reset_mocks():
 def mock_orders_sheet():
     """Создает мок для orders_sheet."""
     mock = MagicMock()
-    mock.get_all_values = MagicMock()
-    mock.update = MagicMock()
-    with patch('orderbot.services.sheets.orders_sheet', mock):
+    mock.get_all_values.return_value = []
+    mock.update.return_value = None
+    mock.update_cell.return_value = None
+    mock.find.return_value = None
+    mock.append_row.return_value = None
+    with patch('orderbot.services.sheets.spreadsheet.get_worksheet_by_id', return_value=mock):
         yield mock
 
 # Фикстура для мока users_sheet
@@ -47,7 +50,42 @@ def mock_orders_sheet():
 def mock_users_sheet():
     """Создает мок для users_sheet."""
     mock = MagicMock()
-    with patch('orderbot.services.sheets.users_sheet', mock):
+    mock.get_all_values.return_value = []
+    mock.update.return_value = None
+    with patch('orderbot.services.sheets.spreadsheet.get_worksheet_by_id', return_value=mock):
+        yield mock
+
+@pytest.fixture
+def mock_kitchen_sheet():
+    """Создает мок для kitchen_sheet."""
+    mock = MagicMock()
+    mock.get_all_values.return_value = []
+    with patch('orderbot.services.sheets.spreadsheet.get_worksheet_by_id', return_value=mock):
+        yield mock
+
+@pytest.fixture
+def mock_rec_sheet():
+    """Создает мок для rec_sheet."""
+    mock = MagicMock()
+    mock.get_all_values.return_value = []
+    mock.update.return_value = None
+    with patch('orderbot.services.sheets.spreadsheet.get_worksheet_by_id', return_value=mock):
+        yield mock
+
+@pytest.fixture
+def mock_auth_sheet():
+    """Создает мок для auth_sheet."""
+    mock = MagicMock()
+    mock.get_all_values.return_value = []
+    with patch('orderbot.services.sheets.spreadsheet.get_worksheet_by_id', return_value=mock):
+        yield mock
+
+@pytest.fixture
+def mock_menu_sheet():
+    """Создает мок для menu_sheet."""
+    mock = MagicMock()
+    mock.col_values.return_value = []
+    with patch('orderbot.services.sheets.client.open.return_value.get_worksheet_by_id', return_value=mock):
         yield mock
 
 @pytest.mark.asyncio
@@ -124,4 +162,40 @@ async def test_update_orders_status_consecutive_rows(mock_orders_sheet: MagicMoc
         'C2:C4',  # Диапазон из трех последовательных строк
         [['Принят'], ['Принят'], ['Принят']],  # Значения для каждой строки
         value_input_option='USER_ENTERED'
-    ) 
+    )
+
+def test_get_orders_sheet(mock_orders_sheet):
+    """Тест получения листа заказов."""
+    from orderbot.services.sheets import get_orders_sheet
+    sheet = get_orders_sheet()
+    assert sheet == mock_orders_sheet
+
+def test_get_users_sheet(mock_users_sheet):
+    """Тест получения листа пользователей."""
+    from orderbot.services.sheets import get_users_sheet
+    sheet = get_users_sheet()
+    assert sheet == mock_users_sheet
+
+def test_get_kitchen_sheet(mock_kitchen_sheet):
+    """Тест получения листа кухни."""
+    from orderbot.services.sheets import get_kitchen_sheet
+    sheet = get_kitchen_sheet()
+    assert sheet == mock_kitchen_sheet
+
+def test_get_rec_sheet(mock_rec_sheet):
+    """Тест получения листа рекомендаций."""
+    from orderbot.services.sheets import get_rec_sheet
+    sheet = get_rec_sheet()
+    assert sheet == mock_rec_sheet
+
+def test_get_auth_sheet(mock_auth_sheet):
+    """Тест получения листа авторизации."""
+    from orderbot.services.sheets import get_auth_sheet
+    sheet = get_auth_sheet()
+    assert sheet == mock_auth_sheet
+
+def test_get_menu_sheet(mock_menu_sheet):
+    """Тест получения листа меню."""
+    from orderbot.services.sheets import get_menu_sheet
+    sheet = get_menu_sheet()
+    assert sheet == mock_menu_sheet 

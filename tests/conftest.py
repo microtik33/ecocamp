@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import asyncio
 from typing import Generator, TYPE_CHECKING
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock, patch
 
 # Добавляем корневую директорию проекта в PYTHONPATH
 project_root = str(Path(__file__).parent.parent)
@@ -30,26 +30,47 @@ mock_gspread = MagicMock()
 mock_gspread.service_account = MagicMock(return_value=MagicMock())
 sys.modules['gspread'] = mock_gspread
 
-# Создаем мок для orders_sheet
+# Создаем моки для всех листов
 mock_orders_sheet = MagicMock()
 mock_orders_sheet.get_all_values = MagicMock()
 mock_orders_sheet.get_all_values.return_value = [
-    ['ID', 'Timestamp', 'Status', 'UserID', 'Username', 'Total', 'Room', 'Name', 'MealType', 'Dishes', 'Wishes', 'DeliveryDate'],
-    ['123', '2024-04-04 12:00:00', 'Активен', '1', '@test_user', '250', '101', 'Test User', 'breakfast', 'Блюдо 1', '-', '05.04.24']
+    ['ID заказа', 'Время', 'Статус', 'User ID', 'Username', 'Сумма заказа', 'Номер комнаты', 'Имя', 'Тип еды', 'Блюда', 'Пожелания', 'Дата выдачи'],
+    ['1', '2023-01-01 12:00', 'Активен', '123', 'test_user', '1000', '101', 'Test User', 'breakfast', 'Блюдо 1', 'Нет', '2023-01-02']
 ]
 mock_orders_sheet.update_cell = MagicMock()
 mock_orders_sheet.find = MagicMock(return_value=MagicMock(row=2))
+mock_orders_sheet.append_row = MagicMock()
 
-# Мокаем services.sheets
-mock_sheets = MagicMock()
-mock_sheets.client = MagicMock()
-mock_sheets.orders_sheet = mock_orders_sheet
-mock_sheets.users_sheet = MagicMock()
-mock_sheets.get_order = AsyncMock(return_value=True)
-mock_sheets.save_order = AsyncMock(return_value=True)
-mock_sheets.update_order = AsyncMock(return_value=True)
-mock_sheets.get_next_order_id = MagicMock(return_value='123')
-mock_sheets.update_orders_status = AsyncMock(return_value=True)
+mock_users_sheet = MagicMock()
+mock_kitchen_sheet = MagicMock()
+mock_rec_sheet = MagicMock()
+mock_auth_sheet = MagicMock()
+mock_menu_sheet = MagicMock()
+
+# Патчим получение всех листов по ID
+with patch('orderbot.services.sheets.spreadsheet.get_worksheet_by_id') as mock_get_worksheet:
+    mock_get_worksheet.side_effect = {
+        2082646960: mock_orders_sheet,
+        505696272: mock_users_sheet,
+        2090492372: mock_kitchen_sheet,
+        1331625926: mock_rec_sheet,
+        66851994: mock_auth_sheet,
+        1808438200: mock_menu_sheet
+    }.get
+    
+    mock_sheets = MagicMock()
+    mock_sheets.client = MagicMock()
+    mock_sheets.orders_sheet = mock_orders_sheet
+    mock_sheets.users_sheet = mock_users_sheet
+    mock_sheets.kitchen_sheet = mock_kitchen_sheet
+    mock_sheets.rec_sheet = mock_rec_sheet
+    mock_sheets.auth_sheet = mock_auth_sheet
+    mock_sheets.menu_sheet = mock_menu_sheet
+    mock_sheets.get_order = AsyncMock(return_value=True)
+    mock_sheets.save_order = AsyncMock(return_value=True)
+    mock_sheets.update_order = AsyncMock(return_value=True)
+    mock_sheets.get_next_order_id = MagicMock(return_value='123')
+    mock_sheets.update_orders_status = AsyncMock(return_value=True)
 sys.modules['orderbot.services.sheets'] = mock_sheets
 
 # Мокаем services.user
@@ -109,6 +130,7 @@ def reset_mocks() -> Generator[None, None, None]:
     mock_orders_sheet.get_all_values.reset_mock()
     mock_orders_sheet.update_cell.reset_mock()
     mock_orders_sheet.find.reset_mock()
+    mock_orders_sheet.append_row.reset_mock()
     mock_user.update_user_info.reset_mock()
     mock_user.update_user_stats.reset_mock()
     mock_auth.is_user_authorized.reset_mock()
