@@ -277,8 +277,10 @@ async def update_user_stats(user_id: str):
                 try:
                     # Парсим дату из формата DD.MM.YYYY HH:MM:SS
                     order_date = datetime.strptime(order[1], "%d.%m.%Y %H:%M:%S")
-                    if not last_order_date or order_date > last_order_date:
+                    # Сравниваем даты как объекты datetime
+                    if last_order_date is None or order_date > last_order_date:
                         last_order_date = order_date
+                        print(f"Найден более новый заказ: {order_date.strftime('%d.%m.%Y %H:%M:%S')}")
                 except ValueError:
                     print(f"Ошибка парсинга даты заказа: {order[1]}")
                     continue
