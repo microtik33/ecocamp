@@ -16,6 +16,7 @@ async def start(update, context):
         # Если пользователь уже авторизован, показываем основное меню
         keyboard = [
             [InlineKeyboardButton(translations.get_button('make_order'), callback_data='new_order')],
+            [InlineKeyboardButton(translations.get_button('tomorrow_menu'), callback_data='tomorrow_menu')],
             [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
             [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
         ]
@@ -57,6 +58,7 @@ async def handle_phone(update, context):
             # Показываем основное меню
             keyboard = [
                 [InlineKeyboardButton(translations.get_button('make_order'), callback_data='new_order')],
+                [InlineKeyboardButton(translations.get_button('tomorrow_menu'), callback_data='tomorrow_menu')],
                 [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
                 [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
             ]
