@@ -448,3 +448,4 @@ def save_user_id(phone: str, user_id: str) -> bool:
 orders_sheet = get_orders_sheet()
 users_sheet = get_users_sheet()
 rec_sheet = get_rec_sheet()
+auth_sheet = get_auth_sheet()
