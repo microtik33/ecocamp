@@ -64,37 +64,41 @@ def stop_status_update_task():
         _status_update_task = None
         logging.info("Задача обновления статусов остановлена")
 
+async def process_daily_tasks():
+    """Обрабатывает ежедневные задачи."""
+    # Сначала обновляем статусы заказов
+    try:
+        await update_orders_status()
+        logging.info("Статусы заказов обновлены")
+    except Exception as e:
+        logging.error(f"Ошибка при обновлении статусов заказов: {e}")
+    
+    # Ждем 1 минуту после смены статусов
+    await asyncio.sleep(60)
+    logging.info("Прошла минута ожидания, начинаем обработку")
+    
+    # Запускаем обработку заказов за день
+    try:
+        await process_daily_orders()
+        logging.info("Обработка заказов завершена успешно")
+    except Exception as e:
+        logging.error(f"Ошибка при обработке заказов: {e}")
+
 async def schedule_daily_tasks():
     """Планировщик ежедневных задач."""
     logging.info("Запуск планировщика ежедневных задач")
     while True:
         # Получаем текущее время
         now = datetime.now()
-        logging.info(f"Текущее время: {now.strftime('%H:%M:%S')}")
+        current_time = now.time()
+        logging.info(f"Текущее время: {current_time.strftime('%H:%M:%S')}")
         
         # Если сейчас полночь (00:00)
-        if now.time() == time(0, 0):
+        if current_time.hour == 0 and current_time.minute == 0:
             logging.info("Наступила полночь, начинаем обработку заказов")
-            
-            # Сначала обновляем статусы заказов
-            try:
-                await update_orders_status()
-                logging.info("Статусы заказов обновлены")
-            except Exception as e:
-                logging.error(f"Ошибка при обновлении статусов заказов: {e}")
-            
-            # Ждем 1 минуту после смены статусов
-            await asyncio.sleep(60)
-            logging.info("Прошла минута ожидания, начинаем обработку")
-            
-            # Запускаем обработку заказов за день
-            try:
-                await process_daily_orders()
-                logging.info("Обработка заказов завершена успешно")
-            except Exception as e:
-                logging.error(f"Ошибка при обработке заказов: {e}")
+            await process_daily_tasks()
         else:
-            logging.info(f"Не полночь (сейчас {now.hour}:{now.minute}), пропускаем обработку")
+            logging.info(f"Не полночь (сейчас {current_time.hour:02d}:{current_time.minute:02d}), пропускаем обработку")
         
         # Проверяем каждую минуту
         await asyncio.sleep(60) 

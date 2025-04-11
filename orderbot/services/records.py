@@ -46,10 +46,6 @@ async def process_daily_orders():
         ]
         logging.info(f"Заказов за текущий день: {len(daily_orders)}")
         
-        if not daily_orders:
-            logging.info("Нет заказов за текущий день")
-            return
-        
         # Получаем все записи из таблицы Rec
         rec_data = rec_sheet.get_all_values()
         logging.info(f"Текущих записей в таблице Rec: {len(rec_data) - 1}")
