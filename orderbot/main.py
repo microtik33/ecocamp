@@ -39,6 +39,7 @@ from aiohttp import web, ClientSession
 from datetime import datetime
 import pytz
 from .services.records import process_daily_orders
+from .services.sheets import auth_sheet
 
 # Включаем tracemalloc для диагностики
 tracemalloc.start()

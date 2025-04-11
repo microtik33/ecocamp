@@ -4,11 +4,10 @@ from datetime import datetime, timedelta, date
 from .. import translations
 from ..services.sheets import (
     orders_sheet, get_dishes_for_meal, get_next_order_id, 
-    update_user_stats, save_order, update_order
+    update_user_stats, save_order, update_order, is_user_authorized
 )
 from ..services.user import update_user_info, update_user_stats
 from ..utils.time_utils import is_order_time
-from ..services.auth import is_user_authorized
 
 # Состояния
 PHONE, MENU, ROOM, NAME, MEAL_TYPE, DISH_SELECTION, WISHES, QUESTION, EDIT_ORDER = range(9)

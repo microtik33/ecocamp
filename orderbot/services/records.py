@@ -1,6 +1,5 @@
 from datetime import datetime, date
-from .sheets import orders_sheet, rec_sheet
-from .auth import auth_sheet
+from .sheets import orders_sheet, rec_sheet, auth_sheet
 from collections import defaultdict
 import logging
 

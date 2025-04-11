@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from telegram import Update, User, Message, Contact
 from telegram.ext import ContextTypes
 from orderbot.handlers.auth import start, handle_phone, MENU, PHONE
-from orderbot.services.auth import is_user_authorized, check_phone, save_user_id
+from orderbot.services.sheets import is_user_authorized, check_phone, save_user_id
 from orderbot.services.user import update_user_info
 
 @pytest.fixture

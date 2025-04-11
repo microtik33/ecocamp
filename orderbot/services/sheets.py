@@ -68,8 +68,8 @@ def get_auth_sheet():
     try:
         return spreadsheet.get_worksheet_by_id(AUTH_SHEET_ID)
     except gspread.WorksheetNotFound:
-        sheet = spreadsheet.add_worksheet("Auth", 1000, 3)
-        sheet.update('A1:C1', [['User ID', 'Auth Token', 'Expiry Date']])
+        sheet = spreadsheet.add_worksheet("Auth", 1000, 2)
+        sheet.update('A1:B1', [['Phone Number', 'User ID']])
         return sheet
 
 def get_menu_sheet():
@@ -147,7 +147,7 @@ async def save_order(order_data):
         ]
         
         # Добавляем заказ в таблицу с value_input_option='USER_ENTERED'
-        orders_sheet.append_row(row, value_input_option='USER_ENTERED')
+        get_orders_sheet().append_row(row, value_input_option='USER_ENTERED')
         return True
         
     except Exception as e:
@@ -401,6 +401,48 @@ def get_credentials():
             f.write(credentials_json)
         return temp_path
     return 'credentials.json'  # Для локальной разработки
+
+# Функции авторизации
+def is_user_authorized(user_id: str) -> bool:
+    """Проверяет, авторизован ли пользователь по его user_id.
+    
+    Args:
+        user_id: ID пользователя для проверки
+        
+    Returns:
+        bool: True если пользователь авторизован, False в противном случае
+    """
+    try:
+        # Получаем все значения из столбца B (user_id)
+        user_ids = get_auth_sheet().col_values(2)
+        return str(user_id) in user_ids
+    except Exception as e:
+        print(f"Ошибка при проверке авторизации пользователя: {e}")
+        return False
+
+def check_phone(phone: str) -> bool:
+    """Проверка наличия телефона в базе."""
+    try:
+        # Получаем все значения из столбца A (телефоны)
+        phones = get_auth_sheet().col_values(1)
+        return phone in phones
+    except Exception as e:
+        print(f"Ошибка при проверке телефона: {e}")
+        return False
+
+def save_user_id(phone: str, user_id: str) -> bool:
+    """Сохранение user_id рядом с телефоном."""
+    try:
+        # Получаем все значения из столбца A (телефоны)
+        phones = get_auth_sheet().col_values(1)
+        # Ищем индекс строки с нужным телефоном
+        row_idx = phones.index(phone) + 1  # +1 потому что в gspread строки начинаются с 1
+        # Обновляем ячейку с user_id (столбец B)
+        get_auth_sheet().update_cell(row_idx, 2, user_id)
+        return True
+    except Exception as e:
+        print(f"Ошибка при сохранении user_id: {e}")
+        return False
 
 # Инициализация листов
 orders_sheet = get_orders_sheet()

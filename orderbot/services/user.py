@@ -1,7 +1,6 @@
 import gspread
 from .. import config
-from .sheets import client, orders_sheet, users_sheet
-from .auth import auth_sheet
+from .sheets import client, orders_sheet, users_sheet, auth_sheet
 from datetime import datetime
 
 async def update_user_info(user):
