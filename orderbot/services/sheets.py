@@ -264,27 +264,29 @@ async def update_user_stats(user_id: str):
     """Обновление статистики пользователя."""
     try:
         # Получаем все заказы
-        all_orders = get_orders_sheet().get_all_values()
+        orders_sheet = get_orders_sheet()
+        all_orders = orders_sheet.get_all_values()
+        print(f"Всего заказов в таблице: {len(all_orders)}")
         
         # Подсчитываем статистику пользователя
         active_orders = 0
         cancelled_orders = 0
         total_sum = 0
-        last_order_id = 0
         last_order_date = None
         
         for order in all_orders[1:]:  # Пропускаем заголовок
             if order[3] == user_id:  # User ID в четвертом столбце
                 try:
-                    # Получаем номер заказа
-                    order_id = int(order[0])
-                    # Если это самый новый заказ по номеру
-                    if order_id > last_order_id:
-                        last_order_id = order_id
-                        last_order_date = order[1]  # Берем дату из второго столбца
-                        print(f"Найден более новый заказ #{order_id} от {last_order_date}")
-                except ValueError:
-                    print(f"Ошибка парсинга номера заказа: {order[0]}")
+                    # Получаем дату заказа
+                    order_date = datetime.strptime(order[1], '%d.%m.%Y %H:%M:%S')
+                    print(f"Найден заказ от {order[1]} для пользователя {user_id}")
+                    
+                    # Если это самый новый заказ по дате
+                    if last_order_date is None or order_date > last_order_date:
+                        print(f"Заказ от {order[1]} новее предыдущего {last_order_date}")
+                        last_order_date = order_date
+                except ValueError as e:
+                    print(f"Ошибка парсинга даты заказа {order[1]}: {e}")
                     continue
                 
                 if order[2] == 'Активен':  # Статус в третьем столбце
@@ -292,6 +294,8 @@ async def update_user_stats(user_id: str):
                     total_sum += float(order[5]) if order[5] else 0  # Сумма в шестом столбце
                 elif order[2] == 'Отменён':
                     cancelled_orders += 1
+        
+        print(f"Найден последний заказ от {last_order_date}")
         
         # Получаем текущие данные пользователя
         users_sheet = get_users_sheet()
@@ -311,7 +315,7 @@ async def update_user_stats(user_id: str):
                                str(int(total_sum)),
                                last_order_date or '']],
                              value_input_option='USER_ENTERED')
-            print(f"Обновлена статистика пользователя {user_id}: {active_orders} активных заказов, {cancelled_orders} отмен, сумма {total_sum}, последний заказ #{last_order_id} от {last_order_date}")
+            print(f"Обновлена статистика пользователя {user_id}: {active_orders} активных заказов, {cancelled_orders} отмен, сумма {total_sum}, последний заказ от {last_order_date}")
         
         return True
     except Exception as e:
