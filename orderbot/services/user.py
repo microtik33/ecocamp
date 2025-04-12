@@ -128,7 +128,8 @@ async def update_user_stats(user_id: str):
         for order in all_orders[1:]:  # Пропускаем заголовок
             if order[3] == user_id:  # User ID в четвертом столбце
                 try:
-                    order_date = datetime.strptime(order[1], "%Y-%m-%d %H:%M:%S")
+                    # Парсим дату в формате DD.MM.YYYY HH:MM:SS
+                    order_date = datetime.strptime(order[1], "%d.%m.%Y %H:%M:%S")
                     logging.info(f"Обработка заказа от {order_date} для пользователя {user_id}")
                     
                     if last_order_date is None or order_date > last_order_date:
@@ -153,8 +154,8 @@ async def update_user_stats(user_id: str):
                 break
         
         if user_row:
-            # Форматируем дату для сохранения
-            formatted_date = last_order_date.strftime("%Y-%m-%d %H:%M:%S") if last_order_date else ''
+            # Форматируем дату для сохранения в том же формате DD.MM.YYYY HH:MM:SS
+            formatted_date = last_order_date.strftime("%d.%m.%Y %H:%M:%S") if last_order_date else ''
             logging.info(f"Обновление статистики для пользователя {user_id}: активных заказов {active_orders}, отмен {cancelled_orders}, сумма {total_sum}, последний заказ {formatted_date}")
             
             # Обновляем статистику (столбцы G-J: Orders Count, Cancellations, Total Sum, Last Order Date)
