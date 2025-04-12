@@ -4,7 +4,9 @@ from telegram.ext import ContextTypes
 from ..services.kitchen import get_orders_summary
 from ..services.sheets import is_user_cook
 from .. import translations
+from ..utils.auth_decorator import require_auth
 
+@require_auth
 async def kitchen_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает сводку по заказам для повара."""
     # Проверяем, является ли пользователь поваром

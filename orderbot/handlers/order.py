@@ -8,6 +8,7 @@ from ..services.sheets import (
 )
 from ..services.user import update_user_info, update_user_stats
 from ..utils.time_utils import is_order_time
+from ..utils.auth_decorator import require_auth
 
 # Состояния
 PHONE, MENU, ROOM, NAME, MEAL_TYPE, DISH_SELECTION, WISHES, QUESTION, EDIT_ORDER = range(9)
@@ -663,6 +664,7 @@ async def handle_text_input(update: telegram.Update, context: telegram.ext.Conte
     context.user_data['order']['name'] = update.message.text
     return await ask_meal_type(update, context)
 
+@require_auth
 async def show_user_orders(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Показ заказов пользователя."""
     # Определяем, как была вызвана функция - через команду или через кнопку
@@ -1256,6 +1258,7 @@ async def show_edit_active_orders(update: telegram.Update, context: telegram.ext
     await query.edit_message_text(message, reply_markup=reply_markup)
     return MENU
 
+@require_auth
 async def start_new_order(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE) -> int:
     """Начинает процесс создания нового заказа."""
     try:

@@ -3,8 +3,10 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from .. import translations
 from ..services.user import update_user_info
 from ..utils.time_utils import is_order_time
+from ..utils.auth_decorator import require_auth
 from .order import MENU
 
+@require_auth
 async def start(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Начало работы с ботом."""
     context.user_data.clear()

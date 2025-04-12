@@ -135,9 +135,6 @@ async def main() -> None:
             },
             fallbacks=[CommandHandler('start', auth_start)],
             allow_reentry=True,
-            # per_message=False используется потому что у нас есть смешанные обработчики
-            # (MessageHandler и CallbackQueryHandler). При per_message=True все обработчики
-            # должны быть CallbackQueryHandler, что не подходит для нашего случая.
             per_message=False
         )
 
