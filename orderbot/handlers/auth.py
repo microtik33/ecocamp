@@ -2,7 +2,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton,
 from .. import translations
 from ..services.sheets import is_user_authorized, check_phone, save_user_id
 from ..services.user import update_user_info
-from .order import PHONE, MENU
+from .states import PHONE, MENU
 
 async def start(update, context):
     """Начало работы с ботом."""

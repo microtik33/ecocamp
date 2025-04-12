@@ -3,7 +3,7 @@ from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import ContextTypes
 from ..services.sheets import is_user_authorized
 from ..handlers.auth import start as auth_start
-from ..handlers.order import PHONE
+from ..handlers.states import PHONE
 from .. import translations
 
 def require_auth(func):

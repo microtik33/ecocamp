@@ -9,9 +9,7 @@ from ..services.sheets import (
 from ..services.user import update_user_info, update_user_stats
 from ..utils.time_utils import is_order_time
 from ..utils.auth_decorator import require_auth
-
-# Состояния
-PHONE, MENU, ROOM, NAME, MEAL_TYPE, DISH_SELECTION, WISHES, QUESTION, EDIT_ORDER = range(9)
+from .states import PHONE, MENU, ROOM, NAME, MEAL_TYPE, DISH_SELECTION, WISHES, QUESTION, EDIT_ORDER
 
 def get_delivery_date(meal_type: str) -> datetime:
     """Определяет дату выдачи заказа. Все заказы создаются на следующий день."""
