@@ -127,9 +127,16 @@ async def update_user_stats(user_id: str):
         
         for order in all_orders[1:]:  # Пропускаем заголовок
             if order[3] == user_id:  # User ID в четвертом столбце
-                order_date = order[1]  # Дата заказа во втором столбце
-                if not last_order_date or order_date > last_order_date:
-                    last_order_date = order_date
+                try:
+                    order_date = datetime.strptime(order[1], "%Y-%m-%d %H:%M:%S")
+                    logging.info(f"Обработка заказа от {order_date} для пользователя {user_id}")
+                    
+                    if last_order_date is None or order_date > last_order_date:
+                        logging.info(f"Найден более новый заказ: {order_date} (было {last_order_date})")
+                        last_order_date = order_date
+                except ValueError as e:
+                    logging.error(f"Ошибка при парсинге даты заказа {order[1]}: {e}")
+                    continue
                 
                 if order[2] in ['Активен', 'Принят']:  # Учитываем активные и принятые заказы
                     active_orders += 1
@@ -146,12 +153,16 @@ async def update_user_stats(user_id: str):
                 break
         
         if user_row:
+            # Форматируем дату для сохранения
+            formatted_date = last_order_date.strftime("%Y-%m-%d %H:%M:%S") if last_order_date else ''
+            logging.info(f"Обновление статистики для пользователя {user_id}: активных заказов {active_orders}, отмен {cancelled_orders}, сумма {total_sum}, последний заказ {formatted_date}")
+            
             # Обновляем статистику (столбцы G-J: Orders Count, Cancellations, Total Sum, Last Order Date)
             users_sheet.update(f'G{user_row}:J{user_row}', 
                              [[str(active_orders), 
                                str(cancelled_orders), 
                                str(int(total_sum)),
-                               last_order_date or '']],
+                               formatted_date]],
                              value_input_option='USER_ENTERED')
         
         logging.info(f"Обновлена статистика пользователей в таблице Users")
