@@ -2,6 +2,7 @@ import gspread
 from .. import config
 from .sheets import client, orders_sheet, users_sheet, auth_sheet
 from datetime import datetime
+import logging
 
 async def update_user_info(user):
     """Обновление информации о пользователе."""
@@ -42,7 +43,7 @@ async def update_user_info(user):
                     phone = row[0]  # Берем номер телефона из первого столбца
                     break
         except Exception as e:
-            print(f"Ошибка при получении номера телефона из таблицы Auth: {e}")
+            logging.error(f"Ошибка при получении номера телефона из таблицы Auth: {e}")
         
         user_found = False
         
@@ -73,9 +74,13 @@ async def update_user_info(user):
             ]
             users_sheet.append_row(new_user_row, value_input_option='USER_ENTERED')
             
+        if user_found:
+            logging.info(f"Обновлена информация о пользователе {user.id} в таблице Users")
+        else:
+            logging.info(f"Создана новая запись о пользователе {user.id} в таблице Users")
         return True
     except Exception as e:
-        print(f"Ошибка при обновлении информации о пользователе: {e}")
+        logging.error(f"Ошибка при обновлении информации о пользователе: {e}")
         return False
 
 async def update_user_totals():
@@ -96,7 +101,7 @@ async def update_user_totals():
                     user_totals[user_id] = 0
                 user_totals[user_id] += amount
             except (ValueError, IndexError) as e:
-                print(f"Ошибка при обработке суммы заказа: {e}")
+                logging.error(f"Ошибка при обработке суммы заказа: {e}")
                 continue
     
     # Получаем все записи о пользователях
@@ -149,9 +154,10 @@ async def update_user_stats(user_id: str):
                                last_order_date or '']],
                              value_input_option='USER_ENTERED')
         
+        logging.info(f"Обновлена статистика пользователей в таблице Users")
         return True
     except Exception as e:
-        print(f"Ошибка при обновлении статистики пользователя: {e}")
+        logging.error(f"Ошибка при обновлении статистики пользователя: {e}")
         return False
 
 async def update_user_info_by_id(user_id: str):
@@ -184,9 +190,11 @@ async def update_user_info_by_id(user_id: str):
             # Сразу обновляем статистику
             await update_user_stats(user_id)
             
-        return True
+            logging.info(f"Создана новая запись о пользователе {user_id} в таблице Users")
+            return True
+        return False
     except Exception as e:
-        print(f"Ошибка при создании записи о пользователе: {e}")
+        logging.error(f"Ошибка при создании записи о пользователе: {e}")
         return False
 
 async def save_user_phone(user_id: str, phone: str):
@@ -197,8 +205,18 @@ async def save_user_phone(user_id: str, phone: str):
             if row[0] == user_id:
                 # Обновляем номер телефона (столбец E)
                 users_sheet.update(f'E{idx + 1}', [[phone]], value_input_option='USER_ENTERED')
+                logging.info(f"Сохранен номер телефона для пользователя {user_id} в таблице Auth")
                 return True
         return False
     except Exception as e:
-        print(f"Ошибка при сохранении номера телефона: {e}")
+        logging.error(f"Ошибка при сохранении номера телефона: {e}")
+        return False
+
+async def create_user_record(user_id: int, username: str, first_name: str, last_name: str) -> bool:
+    try:
+        # ... existing code ...
+        logging.info(f"Создана новая запись о пользователе {user_id} в таблице Users")
+        return True
+    except Exception as e:
+        logging.error(f"Ошибка при создании записи о пользователе: {e}")
         return False 
