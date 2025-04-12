@@ -6,6 +6,7 @@ from functools import lru_cache
 import base64
 import json
 import os
+import logging
 
 # Подключаемся к Google Sheets
 client = gspread.service_account(filename=config.GOOGLE_CREDENTIALS_FILE)
@@ -35,13 +36,13 @@ def get_orders_sheet():
 def get_users_sheet():
     """Получение листа пользователей."""
     try:
-        print(f"Пытаемся получить лист пользователей по ID: {USERS_SHEET_ID}")
+        logging.info(f"Пытаемся получить лист пользователей по ID: {USERS_SHEET_ID}")
         sheet = spreadsheet.get_worksheet_by_id(USERS_SHEET_ID)
-        print(f"Успешно получен лист: {sheet.title}")
+        logging.info(f"Успешно получен лист: {sheet.title}")
         return sheet
     except gspread.WorksheetNotFound as e:
-        print(f"Лист не найден: {e}")
-        print("Создаем новый лист Users")
+        logging.warning(f"Лист не найден: {e}")
+        logging.info("Создаем новый лист Users")
         sheet = spreadsheet.add_worksheet("Users", 1000, 10)
         sheet.update('A1:J1', [['User ID', 'Profile Link', 'First Name', 
                               'Last Name', 'Phone Number', 'Start Time',
@@ -49,7 +50,7 @@ def get_users_sheet():
                               'Total Sum', 'Last Order Date']])
         return sheet
     except Exception as e:
-        print(f"Неожиданная ошибка при получении листа пользователей: {e}")
+        logging.error(f"Неожиданная ошибка при получении листа пользователей: {e}")
         raise
 
 def get_kitchen_sheet():
@@ -159,7 +160,7 @@ async def save_order(order_data):
         return True
         
     except Exception as e:
-        print(f"Ошибка при сохранении заказа: {e}")
+        logging.error(f"Ошибка при сохранении заказа: {e}")
         return False
 
 async def update_order(order_id, row_index, order_data):
@@ -189,7 +190,7 @@ async def update_order(order_id, row_index, order_data):
         return True
         
     except Exception as e:
-        print(f"Ошибка при обновлении заказа: {e}")
+        logging.error(f"Ошибка при обновлении заказа: {e}")
         return False
 
 async def get_user_orders(user_id: str) -> List[List[str]]:
@@ -198,7 +199,7 @@ async def get_user_orders(user_id: str) -> List[List[str]]:
         all_orders = get_orders_sheet().get_all_values()
         return [row for row in all_orders[1:] if row[3] == user_id and row[2] == 'Активен']
     except Exception as e:
-        print(f"Ошибка при получении заказов пользователя: {e}")
+        logging.error(f"Ошибка при получении заказов пользователя: {e}")
         return []
 
 async def update_order_status(order_id: str, row_idx: int, status: str) -> bool:
@@ -207,7 +208,7 @@ async def update_order_status(order_id: str, row_idx: int, status: str) -> bool:
         get_orders_sheet().update_cell(row_idx, 3, status)  # Колонка C содержит статус
         return True
     except Exception as e:
-        print(f"Ошибка при обновлении статуса заказа: {e}")
+        logging.error(f"Ошибка при обновлении статуса заказа: {e}")
         return False
 
 async def save_user_info(user_info: dict):
@@ -217,27 +218,27 @@ async def save_user_info(user_info: dict):
         username = user_info.get('username', '-')
         profile_link = f"t.me/{username}" if username != '-' else '-'
         
-        print(f"Сохраняем информацию о пользователе {user_id}")
+        logging.info(f"Сохраняем информацию о пользователе {user_id}")
         
         # Проверяем, существует ли пользователь
         users_sheet = get_users_sheet()
         users_data = users_sheet.get_all_values()
-        print(f"Получено {len(users_data)} строк из листа пользователей")
+        logging.info(f"Получено {len(users_data)} строк из листа пользователей")
         
         user_exists = False
         for idx, row in enumerate(users_data):
             if row[0] == user_id:
-                print(f"Найден существующий пользователь в строке {idx + 1}")
+                logging.info(f"Найден существующий пользователь в строке {idx + 1}")
                 # Обновляем существующего пользователя
                 users_sheet.update(f'A{idx+1}:C{idx+1}', 
                                  [[user_id, profile_link, username]],
                                  value_input_option='USER_ENTERED')
                 user_exists = True
-                print("Информация о пользователе обновлена")
+                logging.info("Информация о пользователе обновлена")
                 break
         
         if not user_exists:
-            print("Создаем новую запись о пользователе")
+            logging.info("Создаем новую запись о пользователе")
             # Добавляем нового пользователя
             new_user_row = [
                 user_id,
@@ -253,11 +254,11 @@ async def save_user_info(user_info: dict):
                 ''    # Last Order Date
             ]
             users_sheet.append_row(new_user_row, value_input_option='USER_ENTERED')
-            print("Новый пользователь добавлен")
+            logging.info("Новый пользователь добавлен")
         
         return True
     except Exception as e:
-        print(f"Ошибка при сохранении информации о пользователе: {e}")
+        logging.error(f"Ошибка при сохранении информации о пользователе: {e}")
         return False
 
 async def update_user_stats(user_id: str):
@@ -266,7 +267,7 @@ async def update_user_stats(user_id: str):
         # Получаем все заказы
         orders_sheet = get_orders_sheet()
         all_orders = orders_sheet.get_all_values()
-        print(f"Всего заказов в таблице: {len(all_orders)}")
+        logging.info(f"Всего заказов в таблице: {len(all_orders)}")
         
         # Подсчитываем статистику пользователя
         active_orders = 0
@@ -279,14 +280,14 @@ async def update_user_stats(user_id: str):
                 try:
                     # Получаем дату заказа
                     order_date = datetime.strptime(order[1], '%d.%m.%Y %H:%M:%S')
-                    print(f"Найден заказ от {order[1]} для пользователя {user_id}")
+                    logging.info(f"Найден заказ от {order[1]} для пользователя {user_id}")
                     
                     # Если это самый новый заказ по дате
                     if last_order_date is None or order_date > last_order_date:
-                        print(f"Заказ от {order[1]} новее предыдущего {last_order_date}")
+                        logging.info(f"Заказ от {order[1]} новее предыдущего {last_order_date}")
                         last_order_date = order_date
                 except ValueError as e:
-                    print(f"Ошибка парсинга даты заказа {order[1]}: {e}")
+                    logging.error(f"Ошибка парсинга даты заказа {order[1]}: {e}")
                     continue
                 
                 if order[2] == 'Активен':  # Статус в третьем столбце
@@ -295,7 +296,7 @@ async def update_user_stats(user_id: str):
                 elif order[2] == 'Отменён':
                     cancelled_orders += 1
         
-        print(f"Найден последний заказ от {last_order_date}")
+        logging.info(f"Найден последний заказ от {last_order_date}")
         
         # Получаем текущие данные пользователя
         users_sheet = get_users_sheet()
@@ -315,11 +316,11 @@ async def update_user_stats(user_id: str):
                                str(int(total_sum)),
                                last_order_date or '']],
                              value_input_option='USER_ENTERED')
-            print(f"Обновлена статистика пользователя {user_id}: {active_orders} активных заказов, {cancelled_orders} отмен, сумма {total_sum}, последний заказ от {last_order_date}")
+            logging.info(f"Обновлена статистика пользователя {user_id}: {active_orders} активных заказов, {cancelled_orders} отмен, сумма {total_sum}, последний заказ от {last_order_date}")
         
         return True
     except Exception as e:
-        print(f"Ошибка при обновлении статистики пользователя: {e}")
+        logging.error(f"Ошибка при обновлении статистики пользователя: {e}")
         return False
 
 async def get_user_stats(user_id: str):
@@ -336,7 +337,7 @@ async def get_user_stats(user_id: str):
                 }
         return None
     except Exception as e:
-        print(f"Ошибка при получении статистики пользователя: {e}")
+        logging.error(f"Ошибка при получении статистики пользователя: {e}")
         return None
 
 def is_user_cook(user_id: str) -> bool:
@@ -346,7 +347,7 @@ def is_user_cook(user_id: str) -> bool:
         cook_ids = get_kitchen_sheet().col_values(1)
         return str(user_id) in cook_ids
     except Exception as e:
-        print(f"Ошибка при проверке доступа повара: {e}")
+        logging.error(f"Ошибка при проверке доступа повара: {e}")
         return False
 
 def is_order_from_today(order_date_str: str) -> bool:
@@ -382,7 +383,7 @@ async def update_orders_status():
                         if delivery_date == today:
                             updates.append(idx)
                     except ValueError:
-                        print(f"Ошибка при парсинге даты выдачи заказа {order[0]}: {delivery_date_str}")
+                        logging.error(f"Ошибка при парсинге даты выдачи заказа {order[0]}: {delivery_date_str}")
                         continue
         
         # Если есть заказы для обновления, выполняем пакетное обновление
@@ -424,7 +425,7 @@ async def update_orders_status():
         
         return True
     except Exception as e:
-        print(f"Ошибка при обновлении статусов заказов: {e}")
+        logging.error(f"Ошибка при обновлении статусов заказов: {e}")
         return False
 
 def get_credentials():
@@ -454,7 +455,7 @@ def is_user_authorized(user_id: str) -> bool:
         user_ids = get_auth_sheet().col_values(2)
         return str(user_id) in user_ids
     except Exception as e:
-        print(f"Ошибка при проверке авторизации пользователя: {e}")
+        logging.error(f"Ошибка при проверке авторизации пользователя: {e}")
         return False
 
 def check_phone(phone: str) -> bool:
@@ -464,7 +465,7 @@ def check_phone(phone: str) -> bool:
         phones = get_auth_sheet().col_values(1)
         return phone in phones
     except Exception as e:
-        print(f"Ошибка при проверке телефона: {e}")
+        logging.error(f"Ошибка при проверке телефона: {e}")
         return False
 
 def save_user_id(phone: str, user_id: str) -> bool:
@@ -478,7 +479,7 @@ def save_user_id(phone: str, user_id: str) -> bool:
         get_auth_sheet().update_cell(row_idx, 2, user_id)
         return True
     except Exception as e:
-        print(f"Ошибка при сохранении user_id: {e}")
+        logging.error(f"Ошибка при сохранении user_id: {e}")
         return False
 
 # Инициализация листов
