@@ -7,6 +7,7 @@ from telegram.ext import (
     filters
 )
 from telegram import Update
+from . import config  # Импортируем config первым для инициализации логирования
 from .handlers.menu import start
 from .handlers.order import (
     PHONE, MENU, ROOM, NAME, MEAL_TYPE, 
@@ -29,7 +30,6 @@ from .handlers.order import (
 from .handlers.auth import start as auth_start, handle_phone
 from .handlers.kitchen import kitchen_summary
 from .tasks import start_status_update_task, stop_status_update_task, schedule_daily_tasks
-from . import config
 import os
 import asyncio
 import sys

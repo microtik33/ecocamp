@@ -8,14 +8,15 @@ import logging
 from dotenv import load_dotenv
 
 # Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),  # Вывод в консоль
-        logging.FileHandler('bot.log')  # Вывод в файл
-    ]
-)
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),  # Вывод в консоль
+            logging.FileHandler('bot.log')  # Вывод в файл
+        ]
+    )
 
 # Загружаем переменные окружения
 load_dotenv()
