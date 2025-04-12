@@ -86,7 +86,7 @@ def get_menu_sheet():
     return client.open(config.MENU_SHEET_NAME).get_worksheet_by_id(MENU_SHEET_ID)
 
 # Кэш для меню
-_menu_cache: Dict[str, List[Tuple[str, str]]] = {}
+_menu_cache: Dict[str, List[Tuple[str, str, str]]] = {}
 _last_menu_update = None
 _MENU_CACHE_TTL = 300  # 5 минут в секундах
 
@@ -98,22 +98,23 @@ def _update_menu_cache():
     # Если кэш пустой или устарел, обновляем его
     if not _last_menu_update or (current_time - _last_menu_update) > _MENU_CACHE_TTL:
         column_map = {
-            'breakfast': (1, 2),  # A и B столбцы
-            'lunch': (3, 4),      # C и D столбцы
-            'dinner': (5, 6)      # E и F столбцы
+            'breakfast': (1, 2, 3),  # A, B и C столбцы
+            'lunch': (4, 5, 6),      # D, E и F столбцы
+            'dinner': (7, 8, 9)      # G, H и I столбцы
         }
         
         menu_sheet = get_menu_sheet()
-        for meal_type, (dish_col, price_col) in column_map.items():
+        for meal_type, (dish_col, price_col, weight_col) in column_map.items():
             dishes = menu_sheet.col_values(dish_col)[1:]
             prices = menu_sheet.col_values(price_col)[1:]
-            _menu_cache[meal_type] = list(zip(dishes, prices))
+            weights = menu_sheet.col_values(weight_col)[1:]
+            _menu_cache[meal_type] = list(zip(dishes, prices, weights))
         
         _last_menu_update = current_time
 
 @lru_cache(maxsize=100)
-def get_dishes_for_meal(meal_type: str) -> List[Tuple[str, str]]:
-    """Получение списка блюд с ценами для выбранного типа еды."""
+def get_dishes_for_meal(meal_type: str) -> List[Tuple[str, str, str]]:
+    """Получение списка блюд с ценами и весом порций для выбранного типа еды."""
     _update_menu_cache()
     return _menu_cache.get(meal_type, [])
 

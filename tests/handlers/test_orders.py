@@ -3,14 +3,14 @@ from datetime import datetime, timedelta, date
 from typing import TYPE_CHECKING, Generator, Dict, Any
 
 import pytest
-from telegram import Update, User, Chat, Message, CallbackQuery
+from telegram import Update, User, Chat, Message, CallbackQuery, InlineKeyboardMarkup
 from telegram.constants import ChatType
 from telegram.ext import CallbackContext, Application
 from unittest.mock import MagicMock, AsyncMock, patch, ANY
 import sys
 from pytest_mock import MockerFixture
 from orderbot.handlers.order import (
-    MENU, ROOM, NAME, MEAL_TYPE, DISH_SELECTION, WISHES, QUESTION, EDIT, EDIT_ORDER,
+    MENU, ROOM, NAME, MEAL_TYPE, DISH_SELECTION, WISHES, QUESTION, EDIT_ORDER,
     get_delivery_date, show_order_form, handle_order_time_error, ask_room,
     ask_name, ask_meal_type, show_dishes, handle_dish_selection,
     handle_text_input, show_user_orders, handle_question, save_question,
@@ -141,7 +141,10 @@ def mock_sheets():
     with patch('orderbot.services.sheets') as mock_sheets:
         mock_sheets.save_order = AsyncMock(return_value=True)
         mock_sheets.update_order = AsyncMock(return_value=True)
-        mock_sheets.get_dishes_for_meal = MagicMock(return_value=[('Каша', 100), ('Яичница', 150)])
+        mock_sheets.get_dishes_for_meal = MagicMock(return_value=[
+            ('Каша', '100', '200 г'), 
+            ('Яичница', '150', '150 г')
+        ])
         mock_sheets.orders_sheet.get_all_values = AsyncMock(return_value=[
             ['ID', 'Статус', 'Комната', 'Имя', 'Тип', 'Блюда'],
             ['1', 'Активен', '101', 'Иван', 'breakfast', 'Каша']
@@ -236,7 +239,19 @@ async def test_ask_meal_type(mock_update: Update, mock_context: MagicMock) -> No
 
 @pytest.mark.asyncio
 async def test_show_dishes(mock_update: Update, mock_context: MagicMock) -> None:
-    """Тест показа списка блюд."""
+    """
+    Тест показа списка блюд.
+    
+    Проверяет:
+    - Корректность обработки callback_query
+    - Правильность форматирования сообщения с блюдами
+    - Структуру клавиатуры
+    - Обновление состояния пользователя
+    - Обработку ошибок при удалении сообщения
+    - Корректное отображение цен и веса
+    - Правильную обработку количества блюд
+    - Обновление user_data
+    """
     # Настраиваем мок для callback_query
     mock_update.callback_query = AsyncMock()
     mock_update.callback_query.answer = AsyncMock()
@@ -249,29 +264,85 @@ async def test_show_dishes(mock_update: Update, mock_context: MagicMock) -> None
     mock_context.user_data['order'] = {
         'room': '101',
         'name': 'Иван',
-        'meal_type': 'breakfast'
+        'meal_type': 'breakfast',
+        'dishes': ['Каша'],
+        'quantities': {'Каша': 2},
+        'prices': {'Каша': '100'}
     }
+    mock_context.user_data['order_chat_id'] = '12345'
+    mock_context.user_data['order_message_id'] = '67890'
     
-    # Настраиваем мок для translations
+    mock_context.bot = AsyncMock()
+    mock_context.bot.edit_message_text = AsyncMock()
+    
+    # Имитируем реальные данные о блюдах с ценами и весом
+    test_dishes = [
+        ('Каша', '100', '200г'),
+        ('Яичница', '150', '150г'),
+        ('Сырники', '200', '180г')
+    ]
+    
+    # Настраиваем моки
     with patch('orderbot.translations.get_message', return_value='Выберите блюда'), \
          patch('orderbot.translations.get_button', side_effect=lambda x: x), \
-         patch('orderbot.services.sheets.get_dishes_for_meal', return_value=['Каша', 'Яичница']):
+         patch('orderbot.services.sheets.get_dishes_for_meal', return_value=test_dishes):
         
+        # Тестируем основной сценарий
         result = await show_dishes(mock_update, mock_context)
         
-        # Проверяем вызовы
-        mock_update.callback_query.answer.assert_awaited_once()
-        mock_update.callback_query.delete_message.assert_awaited_once()
-        mock_update.callback_query.message.reply_text.assert_awaited_once()
+        # Проверяем, что callback_query был обработан
+        mock_update.callback_query.answer.assert_called_once()
         
-        # Проверяем аргументы вызова reply_text
-        call_args = mock_update.callback_query.message.reply_text.call_args
-        assert call_args is not None
-        assert 'Выберите блюда' in call_args[0][0]
-        assert 'reply_markup' in call_args[1]
+        # Проверяем обновление состояния пользователя
+        assert mock_context.user_data['state'] == DISH_SELECTION
+        assert 'meal_type' in mock_context.user_data['order']
+        assert 'dishes' in mock_context.user_data['order']
+        assert 'quantities' in mock_context.user_data['order']
+        assert 'prices' in mock_context.user_data['order']
         
-        # Проверяем возвращаемое значение
-        assert result == DISH_SELECTION
+        # Проверяем вызов edit_message_text с правильными параметрами
+        mock_context.bot.edit_message_text.assert_called_once()
+        call_args = mock_context.bot.edit_message_text.call_args[1]
+        assert call_args['chat_id'] == '12345'
+        assert call_args['message_id'] == '67890'
+        assert 'Каша x2' in call_args['text']
+        
+        # Проверяем отправку сообщения с клавиатурой
+        mock_update.callback_query.message.reply_text.assert_called_once()
+        keyboard_call = mock_update.callback_query.message.reply_text.call_args[1]
+        reply_markup = keyboard_call['reply_markup']
+        
+        # Проверяем структуру клавиатуры
+        assert isinstance(reply_markup, InlineKeyboardMarkup)
+        keyboard = reply_markup.inline_keyboard
+        
+        # Проверяем кнопки блюд
+        dish_buttons = [button for row in keyboard[:-3] for button in row]
+        assert len(dish_buttons) >= len(test_dishes)  # Учитываем, что для выбранных блюд будет 3 кнопки
+        
+        # Проверяем кнопки управления
+        assert keyboard[-3][0].text == 'done'
+        assert keyboard[-2][0].text == 'back'
+        assert keyboard[-1][0].text == 'cancel'
+        
+        # Проверяем форматирование кнопок с ценами и весом
+        for dish, price, weight in test_dishes:
+            if dish == 'Каша':  # Уже выбранное блюдо
+                button_text = f"✅ {dish} {price} р. ({weight}) (2)"
+                assert any(button_text in btn.text for row in keyboard for btn in row)
+            else:  # Невыбранное блюдо
+                button_text = f"{dish} {price} р. ({weight})"
+                assert any(button_text in btn.text for row in keyboard for btn in row)
+        
+        # Проверяем обработку ошибок при удалении сообщения
+        mock_update.callback_query.delete_message.side_effect = telegram.error.BadRequest("Message to delete not found")
+        result = await show_dishes(mock_update, mock_context)
+        assert result == DISH_SELECTION  # Функция должна продолжить работу несмотря на ошибку
+        
+        # Тестируем сценарий с кнопкой "done"
+        mock_update.callback_query.data = 'done'
+        result = await show_dishes(mock_update, mock_context)
+        assert result == WISHES
 
 @pytest.mark.asyncio
 async def test_handle_dish_selection(mock_update: Update, mock_context: MagicMock) -> None:
@@ -304,12 +375,34 @@ async def test_handle_text_input(mock_update: Update, mock_context: MagicMock) -
 @pytest.mark.asyncio
 async def test_show_user_orders(mock_update: Update, mock_context: MagicMock) -> None:
     """Тест показа заказов пользователя."""
-    result = await show_user_orders(mock_update, mock_context)
-    mock_update.message.reply_text.assert_called_once()
-    args = mock_update.message.reply_text.call_args
-    assert args is not None
-    assert "Ваши активные заказы" in args[0][0]
-    assert result == MENU
+    # Настраиваем мок для заказов
+    mock_orders = [
+        ['ID', 'Время', 'Статус', 'User ID', 'Username', 'Сумма', 'Комната', 'Имя', 'Тип', 'Блюда', 'Пожелания', 'Дата'],
+        ['1', '2024-03-14', 'Активен', '1', '@test', '100', '101', 'Test User', 'breakfast', 'Каша', '-', '2024-03-15']
+    ]
+    
+    with patch('orderbot.services.sheets.get_orders_sheet') as mock_get_sheet:
+        mock_sheet = MagicMock()
+        mock_sheet.get_all_values.return_value = mock_orders
+        mock_get_sheet.return_value = mock_sheet
+        
+        # Настраиваем мок для translations
+        with patch('orderbot.translations.get_message') as mock_get_message:
+            mock_get_message.side_effect = lambda key, **kwargs: {
+                'active_orders_separator': '\n---\n',
+                'total_sum': 'Общая сумма: {sum} р.',
+                'what_next': 'Что дальше?'
+            }.get(key, 'Ваши активные заказы:')
+            
+            with patch('orderbot.translations.get_meal_type', return_value='Завтрак'):
+                result = await show_user_orders(mock_update, mock_context)
+                
+                # Проверяем вызовы
+                mock_update.message.reply_text.assert_called()
+                args = mock_update.message.reply_text.call_args
+                assert args is not None
+                assert "Ваши активные заказы:" in args[0][0]
+                assert result == MENU
 
 @pytest.mark.asyncio
 async def test_handle_question(mock_update: Update, mock_context: MagicMock) -> None:

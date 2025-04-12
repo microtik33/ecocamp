@@ -1,6 +1,7 @@
 import telegram
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 from datetime import datetime, timedelta, date
+import logging
 from .. import translations
 from ..services.sheets import (
     orders_sheet, get_dishes_for_meal, get_next_order_id, 
@@ -10,6 +11,13 @@ from ..services.user import update_user_info, update_user_stats
 from ..utils.time_utils import is_order_time
 from ..utils.auth_decorator import require_auth
 from .states import PHONE, MENU, ROOM, NAME, MEAL_TYPE, DISH_SELECTION, WISHES, QUESTION, EDIT_ORDER
+from typing import List, Tuple, Dict, Optional, Any, Union
+
+# Настройка логгера
+logger = logging.getLogger(__name__)
+
+MAX_DISH_QUANTITY = 10
+MIN_DISH_QUANTITY = 1
 
 def get_delivery_date(meal_type: str) -> datetime:
     """Определяет дату выдачи заказа. Все заказы создаются на следующий день."""
@@ -68,7 +76,7 @@ async def handle_order_time_error(update: telegram.Update, context: telegram.ext
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.edit_message_text(message, reply_markup=reply_markup)
+    await query.edit_message_text(text=message, reply_markup=reply_markup)
     return MENU
 
 async def ask_room(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
@@ -214,81 +222,133 @@ async def ask_meal_type(update: telegram.Update, context: telegram.ext.ContextTy
     context.user_data['prompt_message_id'] = sent_message.message_id
     return MEAL_TYPE
 
-async def show_dishes(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
-    """Показ списка блюд."""
-    query = update.callback_query
-    await query.answer()
+def _build_dish_keyboard(
+    dishes_with_prices: List[Tuple[str, str, str]],
+    quantities: Dict[str, int],
+    prices: Dict[str, str]
+) -> List[List[InlineKeyboardButton]]:
+    """
+    Создает клавиатуру для выбора блюд.
     
-    try:
-        await query.delete_message()
-    except telegram.error.BadRequest:
-        # Игнорируем ошибку, если сообщение уже удалено
-        pass
+    Args:
+        dishes_with_prices: Список кортежей (название_блюда, цена, вес)
+        quantities: Словарь количества выбранных блюд
+        prices: Словарь цен блюд
     
-    context.user_data['state'] = DISH_SELECTION
-    
-    # Проверяем, является ли это кнопкой "Готово"
-    if query.data == "done":
-        return await handle_dish_selection(update, context)
-    
-    # Разбираем callback_data только если это не кнопка "Готово"
-    try:
-        action, value = query.data.split(':')
-    except ValueError:
-        return DISH_SELECTION
-    
-    if action == 'meal':
-        context.user_data['order']['meal_type'] = value
-        context.user_data['order']['dishes'] = []
-        context.user_data['order']['quantities'] = {}  # Добавляем словарь для хранения количества
-        context.user_data['order']['prices'] = {}  # Добавляем словарь для хранения цен
-        # Сохраняем дату выдачи заказа
-        delivery_date = get_delivery_date(value)
-        context.user_data['order']['delivery_date'] = delivery_date
-    
-    order = context.user_data['order']
-    order_message = await show_order_form(update, context)
-    prompt_message = translations.get_message('choose_dishes')
-    
-    # Получаем блюда из кэша
-    dishes_with_prices = get_dishes_for_meal(order['meal_type'])
-    
-    # Формируем клавиатуру
+    Returns:
+        List[List[InlineKeyboardButton]]: Клавиатура с кнопками выбора блюд
+    """
     keyboard = []
-    for dish, price in dishes_with_prices:
-        quantity = order['quantities'].get(dish, 0)
+    for dish, price, weight in dishes_with_prices:
+        quantity = quantities.get(dish, 0)
         if quantity > 0:
-            # Если блюдо уже выбрано, показываем кнопки для изменения количества
-            text = f"✅ {dish} {price} р. ({quantity})"
+            text = f"✅ {dish} {price} р. ({weight}) ({quantity})"
             keyboard.append([
-                InlineKeyboardButton("-", callback_data=f"quantity:{dish}:{quantity-1}"),
+                InlineKeyboardButton("-", callback_data=f"quantity:{dish}:{max(0, quantity-1)}"),
                 InlineKeyboardButton(text, callback_data=f"quantity:{dish}:{quantity}"),
-                InlineKeyboardButton("+", callback_data=f"quantity:{dish}:{quantity+1}")
+                InlineKeyboardButton("+", callback_data=f"quantity:{dish}:{min(MAX_DISH_QUANTITY, quantity+1)}")
             ])
         else:
-            # Если блюдо не выбрано, показываем кнопку выбора
-            text = f"{dish} {price} р."
+            text = f"{dish} {price} р. ({weight})"
             keyboard.append([InlineKeyboardButton(text, callback_data=f"select_dish:{dish}")])
     
+    # Добавляем служебные кнопки
     keyboard.append([InlineKeyboardButton(translations.get_button('done'), callback_data="done")])
     keyboard.append([InlineKeyboardButton(translations.get_button('back'), callback_data="back")])
     keyboard.append([InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")])
     
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    return keyboard
+
+async def show_dishes(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Показывает список доступных блюд и обрабатывает их выбор.
     
+    Функция отображает список блюд с ценами и весом, позволяет выбирать блюда
+    и изменять их количество. Поддерживает следующие действия:
+    - Выбор блюда (добавление в заказ)
+    - Изменение количества выбранного блюда
+    - Подтверждение выбора (кнопка "Готово")
+    - Возврат к предыдущему шагу
+    - Отмена заказа
+    
+    Args:
+        update: Объект обновления от Telegram
+        context: Контекст бота с пользовательскими данными
+    
+    Returns:
+        int: Следующее состояние диалога (DISH_SELECTION или WISHES)
+    
+    Raises:
+        telegram.error.BadRequest: При ошибках отправки сообщений
+    """
+    query = update.callback_query
+    await query.answer()
+    
+    # Проверяем, является ли это кнопкой "done"
+    if query.data == "done":
+        return await handle_dish_selection(update, context)
+    
+    # Пытаемся удалить предыдущее сообщение
     try:
+        await query.message.delete()
+    except telegram.error.BadRequest:
+        pass  # Игнорируем ошибку, если сообщение уже удалено
+    
+    context.user_data['state'] = DISH_SELECTION
+    
+    # Разбираем callback_data
+    try:
+        action, value = query.data.split(':', 1)
+    except ValueError:
+        return DISH_SELECTION
+    
+    order = context.user_data.get('order', {})
+    
+    if action == 'meal':
+        # Инициализация нового заказа
+        order['meal_type'] = value
+        order['dishes'] = []
+        order['quantities'] = {}
+        order['prices'] = {}
+        order['delivery_date'] = get_delivery_date(value)
+        context.user_data['order'] = order
+    
+    # Получаем и отображаем текущий статус заказа
+    try:
+        order_message = await show_order_form(update, context)
         await context.bot.edit_message_text(
             chat_id=context.user_data['order_chat_id'],
             message_id=context.user_data['order_message_id'],
             text=order_message
         )
     except telegram.error.BadRequest as e:
-        if "Message is not modified" in str(e):
-            pass
-        else:
-            raise e
+        if "Message is not modified" not in str(e):
+            logger.error(f"Ошибка при обновлении сообщения заказа: {e}")
     
-    await query.message.reply_text(prompt_message, reply_markup=reply_markup)
+    # Формируем сообщение со списком блюд
+    prompt_message = translations.get_message('choose_dishes')
+    dishes_with_prices = get_dishes_for_meal(order['meal_type'])
+    
+    # Создаем клавиатуру
+    keyboard = _build_dish_keyboard(
+        dishes_with_prices,
+        order.get('quantities', {}),
+        order.get('prices', {})
+    )
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # Отправляем сообщение с клавиатурой
+    try:
+        await query.message.reply_text(prompt_message, reply_markup=reply_markup)
+    except telegram.error.BadRequest as e:
+        logger.error(f"Ошибка при отправке сообщения с меню: {e}")
+        await query.message.reply_text(
+            translations.get_message('error_try_again'),
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton(translations.get_button('back'), callback_data="back")
+            ]])
+        )
+    
     return DISH_SELECTION
 
 async def handle_dish_selection(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
@@ -337,7 +397,7 @@ async def handle_dish_selection(update: telegram.Update, context: telegram.ext.C
             order['dishes'].append(dish)
             # Получаем цену из кэша
             dishes_with_prices = get_dishes_for_meal(order['meal_type'])
-            for d, p in dishes_with_prices:
+            for d, p, w in dishes_with_prices:
                 if d == dish:
                     order['prices'][dish] = p
                     break
@@ -355,26 +415,11 @@ async def handle_dish_selection(update: telegram.Update, context: telegram.ext.C
         dishes_with_prices = get_dishes_for_meal(order['meal_type'])
         
         # Формируем клавиатуру
-        keyboard = []
-        for d, price in dishes_with_prices:
-            qty = order['quantities'].get(d, 0)
-            if qty > 0:
-                # Если блюдо уже выбрано, показываем кнопки для изменения количества
-                text = f"✅ {d} {price} р. ({qty})"
-                keyboard.append([
-                    InlineKeyboardButton("-", callback_data=f"quantity:{d}:{qty-1}"),
-                    InlineKeyboardButton(text, callback_data=f"quantity:{d}:{qty}"),
-                    InlineKeyboardButton("+", callback_data=f"quantity:{d}:{qty+1}")
-                ])
-            else:
-                # Если блюдо не выбрано, показываем кнопку выбора
-                text = f"{d} {price} р."
-                keyboard.append([InlineKeyboardButton(text, callback_data=f"select_dish:{d}")])
-        
-        keyboard.append([InlineKeyboardButton(translations.get_button('done'), callback_data="done")])
-        keyboard.append([InlineKeyboardButton(translations.get_button('back'), callback_data="back")])
-        keyboard.append([InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")])
-        
+        keyboard = _build_dish_keyboard(
+            dishes_with_prices,
+            order.get('quantities', {}),
+            order.get('prices', {})
+        )
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         try:
@@ -419,26 +464,11 @@ async def handle_dish_selection(update: telegram.Update, context: telegram.ext.C
         dishes_with_prices = get_dishes_for_meal(order['meal_type'])
         
         # Формируем клавиатуру
-        keyboard = []
-        for d, price in dishes_with_prices:
-            qty = order['quantities'].get(d, 0)
-            if qty > 0:
-                # Если блюдо уже выбрано, показываем кнопки для изменения количества
-                text = f"✅ {d} {price} р. ({qty})"
-                keyboard.append([
-                    InlineKeyboardButton("-", callback_data=f"quantity:{d}:{qty-1}"),
-                    InlineKeyboardButton(text, callback_data=f"quantity:{d}:{qty}"),
-                    InlineKeyboardButton("+", callback_data=f"quantity:{d}:{qty+1}")
-                ])
-            else:
-                # Если блюдо не выбрано, показываем кнопку выбора
-                text = f"{d} {price} р."
-                keyboard.append([InlineKeyboardButton(text, callback_data=f"select_dish:{d}")])
-        
-        keyboard.append([InlineKeyboardButton(translations.get_button('done'), callback_data="done")])
-        keyboard.append([InlineKeyboardButton(translations.get_button('back'), callback_data="back")])
-        keyboard.append([InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")])
-        
+        keyboard = _build_dish_keyboard(
+            dishes_with_prices,
+            order.get('quantities', {}),
+            order.get('prices', {})
+        )
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         try:
@@ -839,7 +869,17 @@ async def handle_question(update: telegram.Update, context: telegram.ext.Context
     """Обработка вопросов."""
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text(translations.get_message('ask_question'))
+    
+    keyboard = [
+        [InlineKeyboardButton(translations.get_button('back'), callback_data="back")],
+        [InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        text=translations.get_message('ask_question'),
+        reply_markup=reply_markup
+    )
     return QUESTION
 
 async def save_question(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
@@ -1144,29 +1184,12 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
             # Возврат к выбору блюд
             context.user_data['state'] = DISH_SELECTION
             order = context.user_data['order']
-            keyboard = []
-            dishes_with_prices = get_dishes_for_meal(order['meal_type'])
-            for dish, price in dishes_with_prices:
-                qty = order['quantities'].get(dish, 0)
-                if qty > 0:
-                    # Если блюдо уже выбрано, показываем кнопки для изменения количества
-                    text = f"✅ {dish} {price} р. ({qty})"
-                    keyboard.append([
-                        InlineKeyboardButton("-", callback_data=f"quantity:{dish}:{qty-1}"),
-                        InlineKeyboardButton(text, callback_data=f"quantity:{dish}:{qty}"),
-                        InlineKeyboardButton("+", callback_data=f"quantity:{dish}:{qty+1}")
-                    ])
-                else:
-                    # Если блюдо не выбрано, показываем кнопку выбора
-                    text = f"{dish} {price} р."
-                    keyboard.append([InlineKeyboardButton(text, callback_data=f"select_dish:{dish}")])
-            
-            keyboard.append([InlineKeyboardButton(translations.get_button('done'), callback_data="done")])
-            keyboard.append([InlineKeyboardButton(translations.get_button('back'), callback_data="back")])
-            keyboard.append([InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")])
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await context.bot.send_message(chat_id=chat_id, text=translations.get_message('choose_dishes'), reply_markup=reply_markup)
+            keyboard = _build_dish_keyboard(
+                get_dishes_for_meal(order['meal_type']),
+                order.get('quantities', {}),
+                order.get('prices', {})
+            )
+            await context.bot.send_message(chat_id=chat_id, text=translations.get_message('choose_dishes'), reply_markup=InlineKeyboardMarkup(keyboard))
             return DISH_SELECTION
     
     if query.data == 'cancel':
