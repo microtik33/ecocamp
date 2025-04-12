@@ -44,12 +44,6 @@ from .services.sheets import auth_sheet
 # Включаем tracemalloc для диагностики
 tracemalloc.start()
 
-# Настраиваем логирование
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-
 # Устанавливаем часовой пояс для Москвы
 MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 os.environ['TZ'] = 'Europe/Moscow'
