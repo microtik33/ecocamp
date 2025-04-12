@@ -1,3 +1,6 @@
+# Импортируем config первым для инициализации логирования
+from . import config
+
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -7,7 +10,6 @@ from telegram.ext import (
     filters
 )
 from telegram import Update
-from . import config  # Импортируем config первым для инициализации логирования
 from .handlers.menu import start
 from .handlers.order import (
     PHONE, MENU, ROOM, NAME, MEAL_TYPE, 

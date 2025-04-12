@@ -5,18 +5,23 @@ import base64
 import json
 import tempfile
 import logging
-from dotenv import load_dotenv
 
-# Настройка логирования
-if not logging.getLogger().handlers:
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(),  # Вывод в консоль
-            logging.FileHandler('bot.log')  # Вывод в файл
-        ]
-    )
+# Настройка логирования должна быть первой
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),  # Вывод в консоль
+        logging.FileHandler('bot.log')  # Вывод в файл
+    ]
+)
+
+# Настраиваем логирование для всех используемых библиотек
+for logger_name in ['httpx', 'telegram', 'aiohttp']:
+    logging.getLogger(logger_name).setLevel(logging.INFO)
+    logging.getLogger(logger_name).propagate = True
+
+from dotenv import load_dotenv
 
 # Загружаем переменные окружения
 load_dotenv()
