@@ -2,7 +2,7 @@ import telegram
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from .. import translations
 from ..services.user import update_user_info
-from ..utils.time_utils import is_order_time
+from ..utils.time_utils import is_order_time, is_menu_available_time
 from ..utils.auth_decorator import require_auth
 from .order import MENU
 from ..services.sheets import get_dishes_for_meal, get_dish_composition
@@ -27,10 +27,17 @@ async def start(update: telegram.Update, context: telegram.ext.ContextTypes.DEFA
         callback_data='order_time_error'
     )
     
+    # Проверяем, доступно ли меню
+    can_show_menu = is_menu_available_time()
+    menu_button = InlineKeyboardButton(
+        translations.get_button('tomorrow_menu'), 
+        callback_data='tomorrow_menu'
+    )
+    
     # Отправляем приветственное сообщение
     keyboard = [
         [make_order_button],
-        [InlineKeyboardButton(translations.get_button('tomorrow_menu'), callback_data='tomorrow_menu')],
+        [menu_button],
         [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
         [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
     ]
@@ -66,10 +73,17 @@ async def back_to_main_menu(update: telegram.Update, context: telegram.ext.Conte
         callback_data='order_time_error'
     )
     
+    # Проверяем, доступно ли меню
+    can_show_menu = is_menu_available_time()
+    menu_button = InlineKeyboardButton(
+        translations.get_button('tomorrow_menu'), 
+        callback_data='tomorrow_menu'
+    )
+    
     # Отправляем приветственное сообщение
     keyboard = [
         [make_order_button],
-        [InlineKeyboardButton(translations.get_button('tomorrow_menu'), callback_data='tomorrow_menu')],
+        [menu_button],
         [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
         [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
     ]
@@ -87,6 +101,19 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
     """Показывает меню на завтра."""
     query = update.callback_query
     await query.answer()
+    
+    # Проверяем, доступно ли меню в текущее время
+    if not is_menu_available_time():
+        # Если меню недоступно, отображаем сообщение и кнопку возврата
+        message = translations.get_message('menu_not_available')
+        keyboard = [
+            [InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        if query:
+            await query.edit_message_text(text=message, reply_markup=reply_markup)
+        return MENU
     
     # Получаем завтрашнюю дату
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d.%m")
@@ -140,6 +167,18 @@ async def show_dish_compositions(update: telegram.Update, context: telegram.ext.
     """Показывает составы блюд из меню."""
     query = update.callback_query
     await query.answer()
+    
+    # Проверяем, доступно ли меню в текущее время
+    if not is_menu_available_time():
+        # Если меню недоступно, отображаем сообщение и кнопку возврата
+        message = translations.get_message('menu_not_available')
+        keyboard = [
+            [InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(text=message, reply_markup=reply_markup)
+        return MENU
     
     # Получаем завтрашнюю дату
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d.%m")

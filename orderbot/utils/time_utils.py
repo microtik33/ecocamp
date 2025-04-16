@@ -9,4 +9,12 @@ def is_order_time():
     # Если текущее время между 10:00 и 00:00
     if start_time <= current_time or current_time < end_time:
         return True
-    return False 
+    return False
+
+def is_menu_available_time():
+    """Проверяет, доступно ли сейчас меню на завтра (с 10:00 до 00:00).
+    
+    Меню на следующий день становится доступным после 10:00 и 
+    остается доступным до полуночи.
+    """
+    return is_order_time()  # Используем ту же логику, что и для времени заказа 
