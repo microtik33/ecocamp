@@ -57,7 +57,7 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
     if breakfast_dishes:
         for dish, price, weight in breakfast_dishes:
             if dish.strip():  # Проверяем, что название блюда не пустое
-                message += f"- {dish} ({weight}) {price} р\n"
+                message += f"- *{dish}* ({weight}) {price} р\n"
     else:
         message += "Нет доступных блюд\n"
     
@@ -66,7 +66,7 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
     if lunch_dishes:
         for dish, price, weight in lunch_dishes:
             if dish.strip():  # Проверяем, что название блюда не пустое
-                message += f"- {dish} ({weight}) {price} р\n"
+                message += f"- *{dish}* ({weight}) {price} р\n"
     else:
         message += "Нет доступных блюд\n"
     
@@ -75,7 +75,7 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
     if dinner_dishes:
         for dish, price, weight in dinner_dishes:
             if dish.strip():  # Проверяем, что название блюда не пустое
-                message += f"- {dish} ({weight}) {price} р\n"
+                message += f"- *{dish}* ({weight}) {price} р\n"
     else:
         message += "Нет доступных блюд\n"
     
