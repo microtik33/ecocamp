@@ -36,8 +36,51 @@ async def start(update: telegram.Update, context: telegram.ext.ContextTypes.DEFA
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await update.message.reply_text(translations.get_message('welcome'), reply_markup=reply_markup)
+    # Проверяем, вызвана ли функция из обработчика сообщения или из callback
+    if update.message:
+        await update.message.reply_text(translations.get_message('welcome'), reply_markup=reply_markup)
+    elif update.callback_query:
+        await update.callback_query.edit_message_text(
+            text=translations.get_message('welcome'), 
+            reply_markup=reply_markup
+        )
+    
     return MENU 
+
+@require_auth
+async def back_to_main_menu(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
+    """Обработчик для возврата в главное меню из любой точки."""
+    query = update.callback_query
+    await query.answer()
+    
+    # Очищаем данные пользователя
+    context.user_data.clear()
+    
+    # Проверяем время для заказа
+    can_order = is_order_time()
+    make_order_button = InlineKeyboardButton(
+        translations.get_button('make_order'), 
+        callback_data='new_order'
+    ) if can_order else InlineKeyboardButton(
+        translations.get_button('make_order') + ' ⛔', 
+        callback_data='order_time_error'
+    )
+    
+    # Отправляем приветственное сообщение
+    keyboard = [
+        [make_order_button],
+        [InlineKeyboardButton(translations.get_button('tomorrow_menu'), callback_data='tomorrow_menu')],
+        [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
+        [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        text=translations.get_message('welcome'), 
+        reply_markup=reply_markup
+    )
+    
+    return MENU
 
 @require_auth
 async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
@@ -86,7 +129,10 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.edit_message_text(text=message, reply_markup=reply_markup, parse_mode='Markdown')
+    # Проверяем, было ли сообщение отправлено или редактируется
+    if query:
+        await query.edit_message_text(text=message, reply_markup=reply_markup, parse_mode='Markdown')
+    
     return MENU 
 
 @require_auth
@@ -126,9 +172,10 @@ async def show_dish_compositions(update: telegram.Update, context: telegram.ext.
     add_compositions_for_meal_type('lunch', 'Обед')
     add_compositions_for_meal_type('dinner', 'Ужин')
     
-    # Кнопка возврата к меню
+    # Кнопки навигации
     keyboard = [
-        [InlineKeyboardButton(translations.get_button('back_to_menu_list'), callback_data='tomorrow_menu')]
+        [InlineKeyboardButton(translations.get_button('back_to_menu_list'), callback_data='tomorrow_menu')],
+        [InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
