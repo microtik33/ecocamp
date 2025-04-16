@@ -10,7 +10,7 @@ from telegram.ext import (
     filters
 )
 from telegram import Update
-from .handlers.menu import start, show_tomorrow_menu
+from .handlers.menu import start, show_tomorrow_menu, show_dish_compositions
 from .handlers.order import (
     PHONE, MENU, ROOM, NAME, MEAL_TYPE, 
     DISH_SELECTION, WISHES, QUESTION,
@@ -102,6 +102,7 @@ async def main() -> None:
                     CallbackQueryHandler(handle_order_time_error, pattern='order_time_error'),
                     CallbackQueryHandler(show_edit_active_orders, pattern='edit_active_orders'),
                     CallbackQueryHandler(show_tomorrow_menu, pattern='tomorrow_menu'),
+                    CallbackQueryHandler(show_dish_compositions, pattern='show_compositions'),
                     CallbackQueryHandler(start, pattern='back_to_menu')
                 ],
                 ROOM: [

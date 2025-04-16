@@ -21,6 +21,7 @@ KITCHEN_SHEET_ID = 2090492372
 REC_SHEET_ID = 1331625926
 AUTH_SHEET_ID = 66851994
 MENU_SHEET_ID = 1181156289
+COMPOSITION_SHEET_ID = 1127521486  # ID листа с составом блюд
 
 def get_orders_sheet():
     """Получение листа заказов."""
@@ -84,6 +85,10 @@ def get_auth_sheet():
 def get_menu_sheet():
     """Получение листа меню."""
     return client.open(config.MENU_SHEET_NAME).get_worksheet_by_id(MENU_SHEET_ID)
+
+def get_composition_sheet():
+    """Получение листа с составом блюд."""
+    return client.open(config.MENU_SHEET_NAME).get_worksheet_by_id(COMPOSITION_SHEET_ID)
 
 # Кэш для меню
 _menu_cache: Dict[str, List[Tuple[str, str, str]]] = {}
@@ -494,6 +499,62 @@ async def force_update_menu_cache():
     Рекомендуется вызывать эту функцию раз в день в полночь.
     """
     _update_menu_cache(force=True)
+    return True
+
+# Кэш для составов блюд
+_composition_cache = {}
+_last_composition_update = None
+_COMPOSITION_CACHE_TTL = 86400  # 24 часа в секундах
+
+def _update_composition_cache(force=False):
+    """Обновление кэша составов блюд.
+    
+    Args:
+        force: Если True, принудительно обновляет кэш, игнорируя время последнего обновления.
+    """
+    global _last_composition_update
+    current_time = datetime.now().timestamp()
+    
+    # Если кэш пустой или устарел, или требуется принудительное обновление
+    if force or not _last_composition_update or (current_time - _last_composition_update) > _COMPOSITION_CACHE_TTL:
+        composition_sheet = get_composition_sheet()
+        
+        # Получаем данные из таблицы
+        all_values = composition_sheet.get_all_values()
+        
+        # Пропускаем заголовок
+        for row in all_values[1:]:
+            if row and len(row) >= 5:  # Проверяем, что строка не пустая и содержит достаточно столбцов
+                dish_name = row[0].strip()
+                if dish_name:  # Проверяем, что название блюда не пустое
+                    composition = row[3].strip() if len(row) > 3 and row[3] else ""
+                    calories = row[4].strip() if len(row) > 4 and row[4] else ""
+                    _composition_cache[dish_name] = {
+                        "composition": composition,
+                        "calories": calories
+                    }
+        
+        _last_composition_update = current_time
+        logging.info(f"Кэш составов блюд обновлен в {datetime.fromtimestamp(current_time).strftime('%Y-%m-%d %H:%M:%S')}")
+
+def get_dish_composition(dish_name):
+    """Получение состава и калорийности блюда по его названию.
+    
+    Args:
+        dish_name: Название блюда
+        
+    Returns:
+        dict: Словарь с составом и калорийностью блюда, или пустой словарь если блюдо не найдено
+    """
+    _update_composition_cache()
+    return _composition_cache.get(dish_name.strip(), {"composition": "", "calories": ""})
+
+async def force_update_composition_cache():
+    """Принудительно обновляет кэш составов блюд.
+    
+    Рекомендуется вызывать эту функцию вместе с обновлением кэша меню.
+    """
+    _update_composition_cache(force=True)
     return True
 
 # Инициализация листов

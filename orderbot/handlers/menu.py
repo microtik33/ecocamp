@@ -5,7 +5,7 @@ from ..services.user import update_user_info
 from ..utils.time_utils import is_order_time
 from ..utils.auth_decorator import require_auth
 from .order import MENU
-from ..services.sheets import get_dishes_for_meal
+from ..services.sheets import get_dishes_for_meal, get_dish_composition
 from datetime import datetime, timedelta
 
 @require_auth
@@ -79,9 +79,56 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
     else:
         message += "Нет доступных блюд\n"
     
-    # Кнопка возврата в главное меню
+    # Кнопки возврата в главное меню и просмотра составов
     keyboard = [
+        [InlineKeyboardButton(translations.get_button('dish_compositions'), callback_data='show_compositions')],
         [InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(text=message, reply_markup=reply_markup, parse_mode='Markdown')
+    return MENU 
+
+@require_auth
+async def show_dish_compositions(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
+    """Показывает составы блюд из меню."""
+    query = update.callback_query
+    await query.answer()
+    
+    # Получаем завтрашнюю дату
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d.%m.%Y")
+    
+    # Формируем сообщение с составами
+    message = f"🧪 Составы блюд на {tomorrow}:\n\n"
+    
+    # Функция для добавления информации о составах блюд
+    def add_compositions_for_meal_type(meal_type, meal_title):
+        nonlocal message
+        message += f"*{meal_title}*\n\n"
+        dishes = get_dishes_for_meal(meal_type)
+        if dishes:
+            for dish, _, _ in dishes:
+                if dish.strip():  # Проверяем, что название блюда не пустое
+                    composition_info = get_dish_composition(dish)
+                    message += f"*{dish}*\n"
+                    if composition_info['composition']:
+                        message += f"{composition_info['composition']}\n"
+                    else:
+                        message += "Состав не указан\n"
+                    if composition_info['calories']:
+                        message += f"{composition_info['calories']} ккал\n"
+                    message += "\n"
+        else:
+            message += "Нет доступных блюд\n\n"
+    
+    # Добавляем составы для каждого типа приема пищи
+    add_compositions_for_meal_type('breakfast', 'Завтрак')
+    add_compositions_for_meal_type('lunch', 'Обед')
+    add_compositions_for_meal_type('dinner', 'Ужин')
+    
+    # Кнопка возврата к меню
+    keyboard = [
+        [InlineKeyboardButton(translations.get_button('back_to_menu_list'), callback_data='tomorrow_menu')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     

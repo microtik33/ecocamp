@@ -4,7 +4,11 @@ import logging
 import pytz
 
 # Импортируем функции так, чтобы их можно было мокать
-from .services.sheets import update_orders_status, force_update_menu_cache
+from .services.sheets import (
+    update_orders_status, 
+    force_update_menu_cache,
+    force_update_composition_cache
+)
 from .services.records import process_daily_orders
 
 # Глобальная переменная для хранения задачи
@@ -117,12 +121,15 @@ async def schedule_daily_tasks():
         # Если сейчас 9:59 - обновляем кэш меню
         elif current_time.hour == 9 and current_time.minute == 59:
             logging.info("Наступило 9:59, начинаем обновление меню")
-            # Принудительно обновляем кэш меню
+            # Принудительно обновляем кэш меню и составов
             try:
                 await force_update_menu_cache()
                 logging.info("Кэш меню принудительно обновлен")
+                
+                await force_update_composition_cache()
+                logging.info("Кэш составов блюд принудительно обновлен")
             except Exception as e:
-                logging.error(f"Ошибка при обновлении кэша меню: {e}")
+                logging.error(f"Ошибка при обновлении кэша: {e}")
         else:
             logging.info(f"Не время для выполнения задач (сейчас {current_time.hour:02d}:{current_time.minute:02d}), пропускаем обработку")
         
