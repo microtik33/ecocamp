@@ -4,7 +4,7 @@ import logging
 import pytz
 
 # Импортируем функции так, чтобы их можно было мокать
-from .services.sheets import update_orders_status
+from .services.sheets import update_orders_status, force_update_menu_cache
 from .services.records import process_daily_orders
 
 # Глобальная переменная для хранения задачи
@@ -65,8 +65,11 @@ def stop_status_update_task():
         logging.info("Задача обновления статусов остановлена")
 
 async def process_daily_tasks():
-    """Обрабатывает ежедневные задачи."""
-    # Сначала обновляем статусы заказов
+    """Обрабатывает ежедневные задачи.
+    
+    Выполняет обработку заказов за день.
+    """
+    # Обновляем статусы заказов
     try:
         await update_orders_status()
         logging.info("Статусы заказов обновлены")
@@ -93,12 +96,35 @@ async def schedule_daily_tasks():
         current_time = now.time()
         logging.info(f"Текущее время: {current_time.strftime('%H:%M:%S')}")
         
-        # Если сейчас полночь (00:00)
+        # Если сейчас полночь (00:00) - обрабатываем заказы
         if current_time.hour == 0 and current_time.minute == 0:
             logging.info("Наступила полночь, начинаем обработку заказов")
-            await process_daily_tasks()
+            # Обновляем статусы заказов и обрабатываем их
+            try:
+                await update_orders_status()
+                logging.info("Статусы заказов обновлены")
+                
+                # Ждем 1 минуту после смены статусов
+                await asyncio.sleep(60)
+                logging.info("Прошла минута ожидания, начинаем обработку")
+                
+                # Запускаем обработку заказов за день
+                await process_daily_orders()
+                logging.info("Обработка заказов завершена успешно")
+            except Exception as e:
+                logging.error(f"Ошибка при обработке заказов: {e}")
+        
+        # Если сейчас 9:59 - обновляем кэш меню
+        elif current_time.hour == 9 and current_time.minute == 59:
+            logging.info("Наступило 9:59, начинаем обновление меню")
+            # Принудительно обновляем кэш меню
+            try:
+                await force_update_menu_cache()
+                logging.info("Кэш меню принудительно обновлен")
+            except Exception as e:
+                logging.error(f"Ошибка при обновлении кэша меню: {e}")
         else:
-            logging.info(f"Не полночь (сейчас {current_time.hour:02d}:{current_time.minute:02d}), пропускаем обработку")
+            logging.info(f"Не время для выполнения задач (сейчас {current_time.hour:02d}:{current_time.minute:02d}), пропускаем обработку")
         
         # Проверяем каждую минуту
         await asyncio.sleep(60) 

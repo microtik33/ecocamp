@@ -88,15 +88,19 @@ def get_menu_sheet():
 # Кэш для меню
 _menu_cache: Dict[str, List[Tuple[str, str, str]]] = {}
 _last_menu_update = None
-_MENU_CACHE_TTL = 300  # 5 минут в секундах
+_MENU_CACHE_TTL = 86400  # 24 часа в секундах
 
-def _update_menu_cache():
-    """Обновление кэша меню."""
+def _update_menu_cache(force=False):
+    """Обновление кэша меню.
+    
+    Args:
+        force: Если True, принудительно обновляет кэш, игнорируя время последнего обновления.
+    """
     global _last_menu_update
     current_time = datetime.now().timestamp()
     
-    # Если кэш пустой или устарел, обновляем его
-    if not _last_menu_update or (current_time - _last_menu_update) > _MENU_CACHE_TTL:
+    # Если кэш пустой или устарел, или требуется принудительное обновление
+    if force or not _last_menu_update or (current_time - _last_menu_update) > _MENU_CACHE_TTL:
         column_map = {
             'breakfast': (1, 2, 3),  # A, B и C столбцы
             'lunch': (4, 5, 6),      # D, E и F столбцы
@@ -111,6 +115,7 @@ def _update_menu_cache():
             _menu_cache[meal_type] = list(zip(dishes, prices, weights))
         
         _last_menu_update = current_time
+        logging.info(f"Кэш меню обновлен в {datetime.fromtimestamp(current_time).strftime('%Y-%m-%d %H:%M:%S')}")
 
 @lru_cache(maxsize=100)
 def get_dishes_for_meal(meal_type: str) -> List[Tuple[str, str, str]]:
@@ -482,6 +487,14 @@ def save_user_id(phone: str, user_id: str) -> bool:
     except Exception as e:
         logging.error(f"Ошибка при сохранении user_id: {e}")
         return False
+
+async def force_update_menu_cache():
+    """Принудительно обновляет кэш меню.
+    
+    Рекомендуется вызывать эту функцию раз в день в полночь.
+    """
+    _update_menu_cache(force=True)
+    return True
 
 # Инициализация листов
 orders_sheet = get_orders_sheet()
