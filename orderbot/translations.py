@@ -77,8 +77,8 @@ BUTTONS = {
     'return_to_list': '⬅️ Вернуться к списку',
     'tomorrow_menu': 'Меню на завтра',
     'back_to_menu': '⬅️ Вернуться в меню',
-    'dish_compositions': '🧪 Составы блюд',
-    'back_to_menu_list': '⬅️ Вернуться к меню'
+    'dish_compositions': '🍴 Составы блюд',
+    'back_to_menu_list': '⬅️ Назад'
 }
 
 def get_meal_type(meal_type):

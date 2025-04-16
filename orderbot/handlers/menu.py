@@ -46,7 +46,7 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
     await query.answer()
     
     # Получаем завтрашнюю дату
-    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d.%m.%Y")
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d.%m")
     
     # Формируем сообщение с меню
     message = f"🍽️ Меню на {tomorrow}:\n\n"
@@ -96,10 +96,10 @@ async def show_dish_compositions(update: telegram.Update, context: telegram.ext.
     await query.answer()
     
     # Получаем завтрашнюю дату
-    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d.%m.%Y")
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d.%m")
     
     # Формируем сообщение с составами
-    message = f"🧪 Составы блюд на {tomorrow}:\n\n"
+    message = f"🍴 Составы блюд на {tomorrow}:\n\n"
     
     # Функция для добавления информации о составах блюд
     def add_compositions_for_meal_type(meal_type, meal_title):
