@@ -5,6 +5,8 @@ from ..services.user import update_user_info
 from ..utils.time_utils import is_order_time
 from ..utils.auth_decorator import require_auth
 from .order import MENU
+from ..services.sheets import get_dishes_for_meal
+from datetime import datetime, timedelta
 
 @require_auth
 async def start(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
@@ -35,4 +37,53 @@ async def start(update: telegram.Update, context: telegram.ext.ContextTypes.DEFA
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(translations.get_message('welcome'), reply_markup=reply_markup)
+    return MENU 
+
+@require_auth
+async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
+    """Показывает меню на завтра."""
+    query = update.callback_query
+    await query.answer()
+    
+    # Получаем завтрашнюю дату
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d.%m.%Y")
+    
+    # Формируем сообщение с меню
+    message = f"🍽️ Меню на {tomorrow}:\n\n"
+    
+    # Добавляем блюда для завтрака
+    message += "🌅 *Завтрак*\n"
+    breakfast_dishes = get_dishes_for_meal('breakfast')
+    if breakfast_dishes:
+        for dish, price, weight in breakfast_dishes:
+            if dish.strip():  # Проверяем, что название блюда не пустое
+                message += f"- {dish} ({weight}) {price} р\n"
+    else:
+        message += "Нет доступных блюд\n"
+    
+    message += "\n🕛 *Обед*\n"
+    lunch_dishes = get_dishes_for_meal('lunch')
+    if lunch_dishes:
+        for dish, price, weight in lunch_dishes:
+            if dish.strip():  # Проверяем, что название блюда не пустое
+                message += f"- {dish} ({weight}) {price} р\n"
+    else:
+        message += "Нет доступных блюд\n"
+    
+    message += "\n🌇 *Ужин*\n"
+    dinner_dishes = get_dishes_for_meal('dinner')
+    if dinner_dishes:
+        for dish, price, weight in dinner_dishes:
+            if dish.strip():  # Проверяем, что название блюда не пустое
+                message += f"- {dish} ({weight}) {price} р\n"
+    else:
+        message += "Нет доступных блюд\n"
+    
+    # Кнопка возврата в главное меню
+    keyboard = [
+        [InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(text=message, reply_markup=reply_markup, parse_mode='Markdown')
     return MENU 

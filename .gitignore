@@ -71,3 +71,5 @@ coverage.xml
 # Environment variables
 .env
 credentials.json
+
+specs.md
