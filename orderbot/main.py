@@ -42,7 +42,7 @@ from aiohttp import web, ClientSession
 from datetime import datetime
 import pytz
 from .services.records import process_daily_orders
-from .services.sheets import auth_sheet, is_user_cook
+from .services.sheets import auth_sheet, is_user_cook, force_update_menu_cache, force_update_composition_cache
 
 # Включаем tracemalloc для диагностики
 tracemalloc.start()
@@ -80,6 +80,15 @@ async def main() -> None:
         
         # Запускаем задачу поддержания активности
         keep_alive_task = asyncio.create_task(keep_alive())
+
+        # Принудительно обновляем кэш меню и составов при запуске
+        try:
+            logging.info("Обновление кэша меню и составов при запуске бота")
+            await force_update_menu_cache()
+            await force_update_composition_cache()
+            logging.info("Кэш меню и составов успешно обновлен при запуске")
+        except Exception as e:
+            logging.error(f"Ошибка при обновлении кэша при запуске: {e}")
 
         # Добавляем обработчик команды /kitchen для повара
         application.add_handler(CommandHandler('kitchen', kitchen_summary))
