@@ -7,11 +7,10 @@ from telegram.ext import (
     ConversationHandler,
     CallbackQueryHandler,
     MessageHandler,
-    filters,
-    ContextTypes
+    filters
 )
 from telegram import Update
-from .handlers.menu import start, show_tomorrow_menu, show_dish_compositions, back_to_main_menu, show_today_menu
+from .handlers.menu import start, show_tomorrow_menu, show_dish_compositions, back_to_main_menu
 from .handlers.order import (
     PHONE, MENU, ROOM, NAME, MEAL_TYPE, 
     DISH_SELECTION, WISHES, QUESTION,
@@ -28,12 +27,10 @@ from .handlers.order import (
     save_question,
     handle_order_time_error,
     show_edit_active_orders,
-    start_new_order,
-    complete_order,
-    order_summary
+    start_new_order
 )
-from .handlers.auth import start as auth_start, handle_phone, handle_auth_error
-from .handlers.kitchen import kitchen_summary, register_kitchen_handlers
+from .handlers.auth import start as auth_start, handle_phone
+from .handlers.kitchen import kitchen_summary
 from .tasks import start_status_update_task, stop_status_update_task, schedule_daily_tasks
 import os
 import asyncio
@@ -45,7 +42,6 @@ from datetime import datetime
 import pytz
 from .services.records import process_daily_orders
 from .services.sheets import auth_sheet
-import signal
 
 # Включаем tracemalloc для диагностики
 tracemalloc.start()
@@ -87,13 +83,6 @@ async def main() -> None:
         # Добавляем обработчик команды /kitchen для повара
         application.add_handler(CommandHandler('kitchen', kitchen_summary))
         
-        # Регистрация обработчиков команд
-        application.add_handler(CommandHandler("menu", show_tomorrow_menu))
-        application.add_handler(CommandHandler("today", show_today_menu))
-        
-        # Регистрация обработчиков для кухни
-        register_kitchen_handlers(application)
-        
         conv_handler = ConversationHandler(
             entry_points=[
                 CommandHandler('start', auth_start),
@@ -114,7 +103,6 @@ async def main() -> None:
                     CallbackQueryHandler(handle_order_time_error, pattern='order_time_error'),
                     CallbackQueryHandler(show_edit_active_orders, pattern='edit_active_orders'),
                     CallbackQueryHandler(show_tomorrow_menu, pattern='tomorrow_menu'),
-                    CallbackQueryHandler(show_today_menu, pattern='today_menu'),
                     CallbackQueryHandler(show_dish_compositions, pattern='show_compositions'),
                     CallbackQueryHandler(back_to_main_menu, pattern='back_to_menu')
                 ],
@@ -159,7 +147,6 @@ async def main() -> None:
         # Добавляем глобальные обработчики для кнопок, 
         # чтобы они работали даже если пользователь не в активном диалоге
         application.add_handler(CallbackQueryHandler(show_tomorrow_menu, pattern='tomorrow_menu'))
-        application.add_handler(CallbackQueryHandler(show_today_menu, pattern='today_menu'))
         application.add_handler(CallbackQueryHandler(show_dish_compositions, pattern='show_compositions'))
         application.add_handler(CallbackQueryHandler(back_to_main_menu, pattern='back_to_menu'))
         
