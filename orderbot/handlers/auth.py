@@ -14,11 +14,12 @@ async def setup_commands_for_user(bot, user_id=None, is_cook=False):
     """
     # Базовые команды для всех пользователей
     commands = [
-        BotCommand("start", "начать работу с ботом"),
+        BotCommand("new", "новый заказ"),
         BotCommand("menu", "меню на завтра"),
         BotCommand("today", "меню на сегодня"),
-        BotCommand("new", "новый заказ"),
-        BotCommand("myorders", "мои заказы")
+        BotCommand("myorders", "мои заказы"),
+        BotCommand("start", "перезапустить бота")
+
     ]
     
     # Добавляем команду для поваров
