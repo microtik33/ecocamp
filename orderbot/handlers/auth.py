@@ -7,11 +7,11 @@ from .states import PHONE, MENU
 async def setup_commands_for_user(bot, user_id=None, is_cook=False):
     """Устанавливает доступные команды для пользователя в меню команд."""
     base_commands = [
-        BotCommand("start", "Начать работу с ботом"),
-        BotCommand("new", "Создать новый заказ"),
-        BotCommand("myorders", "Мои заказы"),
-        BotCommand("menu", "Посмотреть меню на завтра"),
-        BotCommand("today", "Посмотреть меню на сегодня")
+        BotCommand("new", "новый заказ"),
+        BotCommand("menu", "меню на завтра"),
+        BotCommand("today", "меню на сегодня"),
+        BotCommand("myorders", "мои заказы"),
+        BotCommand("start", "перезапустить бота")
     ]
     
     # Добавляем команды для поваров
