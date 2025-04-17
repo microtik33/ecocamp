@@ -201,7 +201,7 @@ async def show_dish_compositions(update: telegram.Update, context: telegram.ext.
                     else:
                         message += "Состав не указан\n"
                     if composition_info['calories']:
-                        message += f"{composition_info['calories']} ккал\n"
+                        message += f"_{composition_info['calories']} ккал_\n"
                     message += "\n"
         else:
             message += "Нет доступных блюд\n\n"
