@@ -415,7 +415,7 @@ async def show_today_menu(update: telegram.Update, context: telegram.ext.Context
                 return MENU
             
             # Получаем текущую дату в формате дд.мм.гг
-            today = datetime.now().strftime("%d.%m")
+            today = datetime.now().strftime("%d.%m.%y")
             
             # Получаем все строки из листа
             rows = menu_sheet.get_all_values()
@@ -439,7 +439,8 @@ async def show_today_menu(update: telegram.Update, context: telegram.ext.Context
                 return MENU
             
             # Формируем сообщение с меню
-            message = f"🍽️ Меню на сегодня ({today}):\n\n"
+            today_display = datetime.now().strftime("%d.%m")
+            message = f"🍽️ Меню на сегодня ({today_display}):\n\n"
             
             # Получаем названия блюд из диапазона колонок с 3 по 41
             dishes = [dish.strip() for dish in today_menu_row[2:41] if dish.strip()]
