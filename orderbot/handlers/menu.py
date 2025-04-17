@@ -402,7 +402,7 @@ async def show_today_menu(update: telegram.Update, context: telegram.ext.Context
             client = gspread.service_account(filename=config.GOOGLE_CREDENTIALS_FILE)
             
             # Открываем таблицу меню
-            menu_sheet = client.open(config.MENU_SHEET_NAME).get_worksheet_by_id(TODAY_MENU_SHEET_ID)
+            menu_sheet = client.open_by_key(config.MENU_SHEET_ID).get_worksheet_by_id(TODAY_MENU_SHEET_ID)
             if not menu_sheet:
                 message = "Не удалось загрузить меню на сегодня."
                 keyboard = [[InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]]

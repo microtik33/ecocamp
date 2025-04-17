@@ -12,7 +12,7 @@ import logging
 client = gspread.service_account(filename=config.GOOGLE_CREDENTIALS_FILE)
 
 # Открываем таблицу заказов
-spreadsheet = client.open(config.ORDERS_SHEET_NAME)
+spreadsheet = client.open_by_key(config.ORDERS_SHEET_ID)
 
 # ID листов
 ORDERS_SHEET_ID = 2082646960
@@ -84,11 +84,11 @@ def get_auth_sheet():
 
 def get_menu_sheet():
     """Получение листа меню."""
-    return client.open(config.MENU_SHEET_NAME).get_worksheet_by_id(MENU_SHEET_ID)
+    return client.open_by_key(config.MENU_SHEET_ID).get_worksheet_by_id(MENU_SHEET_ID)
 
 def get_composition_sheet():
     """Получение листа с составом блюд."""
-    return client.open(config.MENU_SHEET_NAME).get_worksheet_by_id(COMPOSITION_SHEET_ID)
+    return client.open_by_key(config.MENU_SHEET_ID).get_worksheet_by_id(COMPOSITION_SHEET_ID)
 
 # Кэш для меню
 _menu_cache: Dict[str, List[Tuple[str, str, str]]] = {}

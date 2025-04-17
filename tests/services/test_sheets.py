@@ -15,8 +15,8 @@ if TYPE_CHECKING:
 mock_gspread = MagicMock()
 mock_config = MagicMock()
 mock_config.GOOGLE_CREDENTIALS_FILE = 'fake_credentials.json'
-mock_config.ORDERS_SHEET_NAME = 'Orders'
-mock_config.MENU_SHEET_NAME = 'Menu'
+mock_config.ORDERS_SHEET_ID = 'orders_sheet_id'
+mock_config.MENU_SHEET_ID = 'menu_sheet_id'
 
 # Патчим модули
 sys.modules['gspread'] = mock_gspread
@@ -85,7 +85,7 @@ def mock_menu_sheet():
     """Создает мок для menu_sheet."""
     mock = MagicMock()
     mock.col_values.return_value = []
-    with patch('orderbot.services.sheets.client.open.return_value.get_worksheet_by_id', return_value=mock):
+    with patch('orderbot.services.sheets.client.open_by_key.return_value.get_worksheet_by_id', return_value=mock):
         yield mock
 
 @pytest.mark.asyncio
