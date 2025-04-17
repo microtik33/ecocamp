@@ -38,9 +38,15 @@ async def start(update: telegram.Update, context: telegram.ext.ContextTypes.DEFA
         callback_data='tomorrow_menu'
     )
     
+    today_menu_button = InlineKeyboardButton(
+        translations.get_button('today_menu'), 
+        callback_data='today_menu'
+    )
+    
     # Отправляем приветственное сообщение
     keyboard = [
         [make_order_button],
+        [today_menu_button],
         [menu_button],
         [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
         [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
@@ -89,9 +95,15 @@ async def back_to_main_menu(update: telegram.Update, context: telegram.ext.Conte
             callback_data='tomorrow_menu'
         )
         
+        today_menu_button = InlineKeyboardButton(
+            translations.get_button('today_menu'), 
+            callback_data='today_menu'
+        )
+        
         # Отправляем приветственное сообщение
         keyboard = [
             [make_order_button],
+            [today_menu_button],
             [menu_button],
             [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
             [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
@@ -359,6 +371,150 @@ async def show_dish_compositions(update: telegram.Update, context: telegram.ext.
             if update.callback_query:
                 await update.callback_query.edit_message_text(
                     text=error_message, 
+                    reply_markup=reply_markup
+                )
+        except:
+            # Если даже отправка сообщения об ошибке не удалась, просто игнорируем
+            pass
+        return MENU 
+
+@require_auth
+async def show_today_menu(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
+    """Показывает меню на сегодня с составами блюд."""
+    try:
+        # Убедимся, что контекст разговора инициализирован корректно
+        if 'conversation_state' not in context.user_data:
+            context.user_data['conversation_state'] = MENU
+        
+        # Определяем источник вызова (команда или callback)
+        is_callback = update.callback_query is not None
+        
+        # Отправляем промежуточное сообщение
+        try:
+            if is_callback:
+                query = update.callback_query
+                await query.answer()
+                temp_message = await query.edit_message_text(translations.get_message('loading_compositions'))
+            else:
+                temp_message = await update.message.reply_text(translations.get_message('loading_compositions'))
+        except Exception as e:
+            logger.error(f"Ошибка при отправке промежуточного сообщения: {e}")
+            if is_callback:
+                temp_message = update.callback_query.message
+            else:
+                temp_message = await update.message.reply_text("...")
+        
+        # Получаем сегодняшнюю дату в формате дд.мм.гг
+        today = datetime.now().strftime("%d.%m.%y")
+        
+        # Импортируем необходимые константы и функции
+        from ..services.sheets import client, get_composition_sheet, get_dish_composition
+        
+        # Получаем лист с меню на сегодня
+        sheet = client.open_by_key("1169304186").sheet1
+        
+        # Ищем строку с сегодняшней датой
+        all_values = sheet.get_all_values()
+        
+        found_row = None
+        for row in all_values:
+            if row[0] == today:
+                found_row = row
+                break
+                
+        if not found_row:
+            # Если данных на сегодня нет
+            message = f"На сегодня ({today}) меню не найдено."
+            keyboard = [
+                [InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            try:
+                if is_callback:
+                    await update.callback_query.edit_message_text(text=message, reply_markup=reply_markup)
+                else:
+                    await temp_message.edit_text(text=message, reply_markup=reply_markup)
+            except Exception as e:
+                logger.error(f"Ошибка при отображении сообщения о ненайденном меню: {e}")
+            return MENU
+        
+        # Формируем сообщение с составами блюд на сегодня
+        message = f"🍴 Меню на сегодня ({today}):\n\n"
+        
+        # Получаем список блюд из найденной строки (колонки 3-41)
+        # Индексы в Python начинаются с 0, поэтому колонки 3-41 это индексы 2-40
+        dishes = [dish.strip() for dish in found_row[2:41] if dish.strip()]
+                
+        # Добавляем информацию о блюдах
+        for dish in dishes:
+            composition_info = get_dish_composition(dish)
+            message += f"*{dish}*\n"
+            if composition_info['composition']:
+                message += f"{composition_info['composition']}\n"
+            else:
+                message += "Состав не указан\n"
+            if composition_info['calories']:
+                message += f"_{composition_info['calories']} ккал_\n"
+            message += "\n"
+            
+        # Если блюд не найдено
+        if not dishes:
+            message += "Блюда на сегодня не найдены.\n"
+            
+        # Кнопки навигации
+        keyboard = [
+            [InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Отправляем сообщение
+        try:
+            if is_callback:
+                await update.callback_query.edit_message_text(text=message, reply_markup=reply_markup, parse_mode='Markdown')
+            else:
+                await temp_message.edit_text(text=message, reply_markup=reply_markup, parse_mode='Markdown')
+        except Exception as e:
+            logger.error(f"Ошибка при отправке меню на сегодня: {e}")
+            # Пытаемся отправить сообщение повторно
+            try:
+                if is_callback:
+                    await update.callback_query.edit_message_text(
+                        text=translations.get_message('error_loading_compositions'), 
+                        reply_markup=InlineKeyboardMarkup([[
+                            InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')
+                        ]])
+                    )
+                else:
+                    await update.message.reply_text(
+                        text=translations.get_message('error_loading_compositions'),
+                        reply_markup=InlineKeyboardMarkup([[
+                            InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')
+                        ]])
+                    )
+            except:
+                pass
+                
+        return MENU
+    except Exception as e:
+        # Глобальная обработка ошибок
+        logger.error(f"Критическая ошибка при показе меню на сегодня: {e}")
+        try:
+            # Пытаемся отправить сообщение об ошибке
+            error_message = translations.get_message('error_loading_compositions')
+            keyboard = [
+                [InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            if update.callback_query:
+                await update.callback_query.edit_message_text(
+                    text=error_message, 
+                    reply_markup=reply_markup
+                )
+            elif update.message:
+                await update.message.reply_text(
+                    text=error_message,
                     reply_markup=reply_markup
                 )
         except:
