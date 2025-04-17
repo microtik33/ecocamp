@@ -83,14 +83,12 @@ async def main() -> None:
         # Добавляем обработчик команды /kitchen для повара
         application.add_handler(CommandHandler('kitchen', kitchen_summary))
         
-        # Добавляем обработчик команды /menu для просмотра меню
-        application.add_handler(CommandHandler('menu', show_tomorrow_menu))
-
         conv_handler = ConversationHandler(
             entry_points=[
                 CommandHandler('start', auth_start),
                 CommandHandler('myorders', show_user_orders),
-                CommandHandler('new', start_new_order)
+                CommandHandler('new', start_new_order),
+                CommandHandler('menu', show_tomorrow_menu)
             ],
             states={
                 PHONE: [
@@ -145,6 +143,12 @@ async def main() -> None:
         )
 
         application.add_handler(conv_handler)
+        
+        # Добавляем глобальные обработчики для кнопок, 
+        # чтобы они работали даже если пользователь не в активном диалоге
+        application.add_handler(CallbackQueryHandler(show_tomorrow_menu, pattern='tomorrow_menu'))
+        application.add_handler(CallbackQueryHandler(show_dish_compositions, pattern='show_compositions'))
+        application.add_handler(CallbackQueryHandler(back_to_main_menu, pattern='back_to_menu'))
         
         # Запуск планировщика задач
         asyncio.create_task(schedule_daily_tasks())
