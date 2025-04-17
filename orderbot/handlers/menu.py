@@ -99,8 +99,12 @@ async def back_to_main_menu(update: telegram.Update, context: telegram.ext.Conte
 @require_auth
 async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Показывает меню на завтра."""
-    query = update.callback_query
-    await query.answer()
+    # Определяем источник вызова (команда или callback)
+    is_callback = update.callback_query is not None
+    
+    if is_callback:
+        query = update.callback_query
+        await query.answer()
     
     # Проверяем, доступно ли меню в текущее время
     if not is_menu_available_time():
@@ -111,8 +115,10 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        if query:
+        if is_callback:
             await query.edit_message_text(text=message, reply_markup=reply_markup)
+        else:
+            await update.message.reply_text(text=message, reply_markup=reply_markup)
         return MENU
     
     # Получаем завтрашнюю дату
@@ -156,11 +162,13 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # Проверяем, было ли сообщение отправлено или редактируется
-    if query:
+    # Отправляем или редактируем сообщение в зависимости от источника вызова
+    if is_callback:
         await query.edit_message_text(text=message, reply_markup=reply_markup, parse_mode='Markdown')
+    else:
+        await update.message.reply_text(text=message, reply_markup=reply_markup, parse_mode='Markdown')
     
-    return MENU 
+    return MENU
 
 @require_auth
 async def show_dish_compositions(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
@@ -189,7 +197,7 @@ async def show_dish_compositions(update: telegram.Update, context: telegram.ext.
     # Функция для добавления информации о составах блюд
     def add_compositions_for_meal_type(meal_type, meal_title):
         nonlocal message
-        message += f"*{meal_title}*\n\n"
+        message += f"*{meal_title}:*\n\n"
         dishes = get_dishes_for_meal(meal_type)
         if dishes:
             for dish, _, _ in dishes:

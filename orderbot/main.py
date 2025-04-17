@@ -82,6 +82,9 @@ async def main() -> None:
 
         # Добавляем обработчик команды /kitchen для повара
         application.add_handler(CommandHandler('kitchen', kitchen_summary))
+        
+        # Добавляем обработчик команды /menu для просмотра меню
+        application.add_handler(CommandHandler('menu', show_tomorrow_menu))
 
         conv_handler = ConversationHandler(
             entry_points=[
