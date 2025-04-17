@@ -102,9 +102,15 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
     # Определяем источник вызова (команда или callback)
     is_callback = update.callback_query is not None
     
+    # Отправляем промежуточное сообщение
     if is_callback:
         query = update.callback_query
         await query.answer()
+        # В случае callback не можем отправить новое сообщение, но можем изменить текущее
+        temp_message = await query.edit_message_text(translations.get_message('loading_menu'))
+    else:
+        # Для команды можем отправить новое сообщение
+        temp_message = await update.message.reply_text(translations.get_message('loading_menu'))
     
     # Проверяем, доступно ли меню в текущее время
     if not is_menu_available_time():
@@ -118,7 +124,7 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
         if is_callback:
             await query.edit_message_text(text=message, reply_markup=reply_markup)
         else:
-            await update.message.reply_text(text=message, reply_markup=reply_markup)
+            await temp_message.edit_text(text=message, reply_markup=reply_markup)
         return MENU
     
     # Получаем завтрашнюю дату
@@ -166,7 +172,7 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
     if is_callback:
         await query.edit_message_text(text=message, reply_markup=reply_markup, parse_mode='Markdown')
     else:
-        await update.message.reply_text(text=message, reply_markup=reply_markup, parse_mode='Markdown')
+        await temp_message.edit_text(text=message, reply_markup=reply_markup, parse_mode='Markdown')
     
     return MENU
 
@@ -175,6 +181,9 @@ async def show_dish_compositions(update: telegram.Update, context: telegram.ext.
     """Показывает составы блюд из меню."""
     query = update.callback_query
     await query.answer()
+    
+    # Отправляем промежуточное сообщение
+    await query.edit_message_text(translations.get_message('loading_compositions'))
     
     # Проверяем, доступно ли меню в текущее время
     if not is_menu_available_time():
