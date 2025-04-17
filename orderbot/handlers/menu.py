@@ -10,6 +10,9 @@ from datetime import datetime, timedelta
 import logging
 import gspread
 from .. import config
+from telegram.ext import ContextTypes
+from ..utils.profiler import profile_time
+import asyncio
 
 # Настройка логгера
 logger = logging.getLogger(__name__)
@@ -132,7 +135,7 @@ async def back_to_main_menu(update: telegram.Update, context: telegram.ext.Conte
             pass
         return MENU
 
-@require_auth
+@profile_time
 async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Показывает меню на завтра."""
     try:
@@ -277,7 +280,7 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
             pass
         return MENU
 
-@require_auth
+@profile_time
 async def show_dish_compositions(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Показывает составы блюд из меню."""
     try:
@@ -368,7 +371,7 @@ async def show_dish_compositions(update: telegram.Update, context: telegram.ext.
             pass
         return MENU 
 
-@require_auth
+@profile_time
 async def show_today_menu(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Показывает меню на сегодня с составами и калорийностью блюд."""
     try:

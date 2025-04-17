@@ -31,6 +31,7 @@ from .handlers.order import (
 )
 from .handlers.auth import start as auth_start, handle_phone, setup_commands_for_user
 from .handlers.kitchen import kitchen_summary
+from .handlers.stats import performance_stats, clear_performance_stats, memory_stats
 from .tasks import start_status_update_task, stop_status_update_task, schedule_daily_tasks
 import os
 import asyncio
@@ -85,6 +86,11 @@ async def main() -> None:
         
         # Добавляем обработчик команды /today для просмотра меню на сегодня
         application.add_handler(CommandHandler('today', show_today_menu))
+        
+        # Добавляем обработчики команд статистики
+        application.add_handler(CommandHandler('stats', performance_stats))
+        application.add_handler(CommandHandler('clearstats', clear_performance_stats))
+        application.add_handler(CommandHandler('memory', memory_stats))
         
         # Устанавливаем базовые команды для всех пользователей
         await setup_commands_for_user(application.bot)

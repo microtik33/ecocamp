@@ -12,6 +12,7 @@ from ..utils.time_utils import is_order_time
 from ..utils.auth_decorator import require_auth
 from .states import PHONE, MENU, ROOM, NAME, MEAL_TYPE, DISH_SELECTION, WISHES, QUESTION, EDIT_ORDER
 from typing import List, Tuple, Dict, Optional, Any, Union
+from ..utils.profiler import profile_time
 
 # Настройка логгера
 logger = logging.getLogger(__name__)
@@ -79,6 +80,7 @@ async def handle_order_time_error(update: telegram.Update, context: telegram.ext
     await query.edit_message_text(text=message, reply_markup=reply_markup)
     return MENU
 
+@profile_time
 async def ask_room(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Запрос номера комнаты."""
     query = update.callback_query
@@ -152,6 +154,7 @@ async def ask_name(update: telegram.Update, context: telegram.ext.ContextTypes.D
     context.user_data['prompt_message_id'] = sent_message.message_id
     return NAME
 
+@profile_time
 async def ask_meal_type(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Запрос типа еды."""
     context.user_data['state'] = MEAL_TYPE
@@ -259,6 +262,7 @@ def _build_dish_keyboard(
     
     return keyboard
 
+@profile_time
 async def show_dishes(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE) -> int:
     """
     Показывает список доступных блюд и обрабатывает их выбор.
@@ -351,6 +355,7 @@ async def show_dishes(update: telegram.Update, context: telegram.ext.ContextType
     
     return DISH_SELECTION
 
+@profile_time
 async def handle_dish_selection(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Обработка выбора блюд."""
     query = update.callback_query
@@ -692,7 +697,7 @@ async def handle_text_input(update: telegram.Update, context: telegram.ext.Conte
     context.user_data['order']['name'] = update.message.text
     return await ask_meal_type(update, context)
 
-@require_auth
+@profile_time
 async def show_user_orders(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Показ заказов пользователя."""
     # Определяем, как была вызвана функция - через команду или через кнопку
@@ -1279,7 +1284,7 @@ async def show_edit_active_orders(update: telegram.Update, context: telegram.ext
     await query.edit_message_text(message, reply_markup=reply_markup)
     return MENU
 
-@require_auth
+@profile_time
 async def start_new_order(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE) -> int:
     """Начинает процесс создания нового заказа."""
     try:

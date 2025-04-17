@@ -1,37 +1,35 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, BotCommand
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, BotCommand, BotCommandScopeChat, BotCommandScopeDefault
 from .. import translations
 from ..services.sheets import is_user_authorized, check_phone, save_user_id, is_user_cook
 from ..services.user import update_user_info
 from .states import PHONE, MENU
 
 async def setup_commands_for_user(bot, user_id=None, is_cook=False):
-    """Настраивает команды бота для конкретного пользователя или глобально.
-    
-    Args:
-        bot: Экземпляр бота
-        user_id: ID пользователя или None для глобальных команд
-        is_cook: Флаг, указывающий, является ли пользователь поваром
-    """
-    # Базовые команды для всех пользователей
-    commands = [
-        BotCommand("new", "новый заказ"),
-        BotCommand("menu", "меню на завтра"),
-        BotCommand("today", "меню на сегодня"),
-        BotCommand("myorders", "мои заказы"),
-        BotCommand("start", "перезапустить бота")
-
+    """Устанавливает доступные команды для пользователя в меню команд."""
+    base_commands = [
+        BotCommand("start", "Начать работу с ботом"),
+        BotCommand("new", "Создать новый заказ"),
+        BotCommand("myorders", "Мои заказы"),
+        BotCommand("menu", "Посмотреть меню на завтра"),
+        BotCommand("today", "Посмотреть меню на сегодня")
     ]
     
-    # Добавляем команду для поваров
+    # Добавляем команды для поваров
     if is_cook:
-        commands.append(BotCommand("kitchen", "сводка по заказам для повара"))
+        cook_commands = [
+            BotCommand("kitchen", "Сводка для кухни"),
+            BotCommand("stats", "Статистика производительности"),
+            BotCommand("clearstats", "Очистить статистику производительности"),
+            BotCommand("memory", "Статистика использования памяти")
+        ]
+        base_commands.extend(cook_commands)
     
-    # Если указан user_id, устанавливаем команды для конкретного пользователя
-    # Иначе устанавливаем глобальные команды
+    # Если пользователь указан, устанавливаем команды только для этого пользователя
     if user_id:
-        await bot.set_my_commands(commands, scope={"type": "chat", "chat_id": user_id})
+        await bot.set_my_commands(base_commands, scope=BotCommandScopeChat(chat_id=user_id))
     else:
-        await bot.set_my_commands(commands)
+        # Иначе устанавливаем общие команды для всех пользователей
+        await bot.set_my_commands(base_commands, scope=BotCommandScopeDefault())
 
 async def start(update, context):
     """Начало работы с ботом."""

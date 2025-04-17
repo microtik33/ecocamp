@@ -7,6 +7,7 @@ import base64
 import json
 import os
 import logging
+from ..utils.profiler import profile_time
 
 # Подключаемся к Google Sheets
 client = gspread.service_account(filename=config.GOOGLE_CREDENTIALS_FILE)
@@ -23,6 +24,7 @@ AUTH_SHEET_ID = 66851994
 MENU_SHEET_ID = 1181156289
 COMPOSITION_SHEET_ID = 1127521486  # ID листа с составом блюд
 
+@profile_time
 def get_orders_sheet():
     """Получение листа заказов."""
     try:
@@ -34,6 +36,7 @@ def get_orders_sheet():
                               'Тип еды', 'Блюда', 'Пожелания', 'Дата выдачи']])
         return sheet
 
+@profile_time
 def get_users_sheet():
     """Получение листа пользователей."""
     try:
@@ -54,6 +57,7 @@ def get_users_sheet():
         logging.error(f"Неожиданная ошибка при получении листа пользователей: {e}")
         raise
 
+@profile_time
 def get_kitchen_sheet():
     """Получение листа кухни."""
     try:
@@ -63,6 +67,7 @@ def get_kitchen_sheet():
         sheet.update('A1', [['User ID']])
         return sheet
 
+@profile_time
 def get_rec_sheet():
     """Получение листа записей."""
     try:
@@ -73,6 +78,7 @@ def get_rec_sheet():
                               'Средний чек', 'Количество отмен', 'Процент отмен']])
         return sheet
 
+@profile_time
 def get_auth_sheet():
     """Получение листа авторизации."""
     try:
@@ -82,10 +88,12 @@ def get_auth_sheet():
         sheet.update('A1:B1', [['Phone Number', 'User ID']])
         return sheet
 
+@profile_time
 def get_menu_sheet():
     """Получение листа меню."""
     return client.open_by_key(config.MENU_SHEET_ID).get_worksheet_by_id(MENU_SHEET_ID)
 
+@profile_time
 def get_composition_sheet():
     """Получение листа с составом блюд."""
     return client.open_by_key(config.MENU_SHEET_ID).get_worksheet_by_id(COMPOSITION_SHEET_ID)
@@ -95,6 +103,7 @@ _menu_cache: Dict[str, List[Tuple[str, str, str]]] = {}
 _last_menu_update = None
 _MENU_CACHE_TTL = 86400  # 24 часа в секундах
 
+@profile_time
 def _update_menu_cache(force=False):
     """Обновление кэша меню.
     
@@ -122,6 +131,7 @@ def _update_menu_cache(force=False):
         _last_menu_update = current_time
         logging.info(f"Кэш меню обновлен в {datetime.fromtimestamp(current_time).strftime('%Y-%m-%d %H:%M:%S')}")
 
+@profile_time
 @lru_cache(maxsize=100)
 def get_dishes_for_meal(meal_type: str) -> List[Tuple[str, str, str]]:
     """Получение списка блюд с ценами и весом порций для выбранного типа еды."""
@@ -140,6 +150,7 @@ def get_next_order_id():
         return "1"
     return str(int(all_orders[-1][0]) + 1)
 
+@profile_time
 async def save_order(order_data):
     """Сохраняет новый заказ в таблицу."""
     try:
@@ -174,6 +185,7 @@ async def save_order(order_data):
         logging.error(f"Ошибка при сохранении заказа: {e}")
         return False
 
+@profile_time
 async def update_order(order_id, row_index, order_data):
     """Обновляет существующий заказ в таблице."""
     try:
@@ -204,6 +216,7 @@ async def update_order(order_id, row_index, order_data):
         logging.error(f"Ошибка при обновлении заказа: {e}")
         return False
 
+@profile_time
 async def get_user_orders(user_id: str) -> List[List[str]]:
     """Получение всех активных заказов пользователя."""
     try:
@@ -272,6 +285,7 @@ async def save_user_info(user_info: dict):
         logging.error(f"Ошибка при сохранении информации о пользователе: {e}")
         return False
 
+@profile_time
 async def update_user_stats(user_id: str):
     """Обновление статистики пользователя."""
     try:
@@ -506,6 +520,7 @@ _composition_cache = {}
 _last_composition_update = None
 _COMPOSITION_CACHE_TTL = 86400  # 24 часа в секундах
 
+@profile_time
 def _update_composition_cache(force=False):
     """Обновление кэша составов блюд.
     
