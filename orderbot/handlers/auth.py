@@ -1,8 +1,9 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 from .. import translations
-from ..services.sheets import is_user_authorized, check_phone, save_user_id
+from ..services.sheets import is_user_authorized, check_phone, save_user_id, is_user_cook
 from ..services.user import update_user_info
 from .states import PHONE, MENU
+from ..main import setup_commands_for_user
 
 async def start(update, context):
     """Начало работы с ботом."""
@@ -54,6 +55,12 @@ async def handle_phone(update, context):
             keyboard = [[KeyboardButton(translations.get_button('share_phone'), request_contact=True)]]
             reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
             await update.message.reply_text(translations.get_message('auth_success'), reply_markup=ReplyKeyboardRemove())
+            
+            # Проверяем, является ли пользователь поваром
+            is_cook = is_user_cook(user_id)
+            
+            # Устанавливаем команды для пользователя в зависимости от его роли
+            await setup_commands_for_user(context.bot, int(user_id), is_cook)
             
             # Показываем основное меню
             keyboard = [

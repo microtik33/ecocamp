@@ -9,7 +9,7 @@ from telegram.ext import (
     MessageHandler,
     filters
 )
-from telegram import Update
+from telegram import Update, BotCommand
 from .handlers.menu import start, show_tomorrow_menu, show_dish_compositions, back_to_main_menu, show_today_menu
 from .handlers.order import (
     PHONE, MENU, ROOM, NAME, MEAL_TYPE, 
@@ -41,7 +41,7 @@ from aiohttp import web, ClientSession
 from datetime import datetime
 import pytz
 from .services.records import process_daily_orders
-from .services.sheets import auth_sheet
+from .services.sheets import auth_sheet, is_user_cook
 
 # Включаем tracemalloc для диагностики
 tracemalloc.start()
@@ -66,6 +66,34 @@ async def keep_alive():
                 logging.error(f"Ошибка в keep_alive: {e}")
                 await asyncio.sleep(60)  # При ошибке ждем 1 минуту перед повторной попыткой
 
+async def setup_commands_for_user(bot, user_id=None, is_cook=False):
+    """Настраивает команды бота для конкретного пользователя или глобально.
+    
+    Args:
+        bot: Экземпляр бота
+        user_id: ID пользователя или None для глобальных команд
+        is_cook: Флаг, указывающий, является ли пользователь поваром
+    """
+    # Базовые команды для всех пользователей
+    commands = [
+        BotCommand("start", "начать работу с ботом"),
+        BotCommand("menu", "меню на завтра"),
+        BotCommand("today", "меню на сегодня"),
+        BotCommand("new", "новый заказ"),
+        BotCommand("myorders", "мои заказы")
+    ]
+    
+    # Добавляем команду для поваров
+    if is_cook:
+        commands.append(BotCommand("kitchen", "сводка по заказам для повара"))
+    
+    # Если указан user_id, устанавливаем команды для конкретного пользователя
+    # Иначе устанавливаем глобальные команды
+    if user_id:
+        await bot.set_my_commands(commands, scope={"type": "chat", "chat_id": user_id})
+    else:
+        await bot.set_my_commands(commands)
+
 async def main() -> None:
     """Запуск бота."""
     # Инициализация приложения
@@ -85,6 +113,22 @@ async def main() -> None:
         
         # Добавляем обработчик команды /today для просмотра меню на сегодня
         application.add_handler(CommandHandler('today', show_today_menu))
+        
+        # Устанавливаем базовые команды для всех пользователей
+        await setup_commands_for_user(application.bot)
+        
+        # Настраиваем обработчик для проверки пользователя после авторизации
+        async def post_auth_command_setup(update: Update, context):
+            user_id = update.effective_user.id
+            is_cook = is_user_cook(str(user_id))
+            await setup_commands_for_user(context.bot, user_id, is_cook)
+            return None
+            
+        # Добавляем обработчик для настройки команд после авторизации
+        application.add_handler(
+            MessageHandler(filters.Regex(r'.*Авторизация успешна.*'), post_auth_command_setup),
+            group=999
+        )
         
         conv_handler = ConversationHandler(
             entry_points=[
