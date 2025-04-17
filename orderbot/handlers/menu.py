@@ -415,7 +415,7 @@ async def show_today_menu(update: telegram.Update, context: telegram.ext.Context
                 return MENU
             
             # Получаем текущую дату в формате дд.мм.гг
-            today = datetime.now().strftime("%d.%m.%y")
+            today = datetime.now().strftime("%d.%m")
             
             # Получаем все строки из листа
             rows = menu_sheet.get_all_values()
