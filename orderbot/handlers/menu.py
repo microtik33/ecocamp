@@ -8,6 +8,8 @@ from .order import MENU
 from ..services.sheets import get_dishes_for_meal, get_dish_composition
 from datetime import datetime, timedelta
 import logging
+import gspread
+from .. import config
 
 # Настройка логгера
 logger = logging.getLogger(__name__)
@@ -359,6 +361,164 @@ async def show_dish_compositions(update: telegram.Update, context: telegram.ext.
             if update.callback_query:
                 await update.callback_query.edit_message_text(
                     text=error_message, 
+                    reply_markup=reply_markup
+                )
+        except:
+            # Если даже отправка сообщения об ошибке не удалась, просто игнорируем
+            pass
+        return MENU 
+
+@require_auth
+async def show_today_menu(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
+    """Показывает меню на сегодня с составами и калорийностью блюд."""
+    try:
+        # Убедимся, что контекст разговора инициализирован корректно
+        if 'conversation_state' not in context.user_data:
+            context.user_data['conversation_state'] = MENU
+        
+        # Определяем источник вызова (команда или callback)
+        is_callback = update.callback_query is not None
+        
+        # Отправляем промежуточное сообщение
+        try:
+            if is_callback:
+                query = update.callback_query
+                await query.answer()
+                temp_message = await query.edit_message_text(translations.get_message('loading_menu'))
+            else:
+                temp_message = await update.message.reply_text(translations.get_message('loading_menu'))
+        except Exception as e:
+            logger.error(f"Ошибка при отправке промежуточного сообщения: {e}")
+            if is_callback:
+                temp_message = update.callback_query.message
+            else:
+                temp_message = await update.message.reply_text("...")
+        
+        # ID листа с меню на сегодня
+        TODAY_MENU_SHEET_ID = 1169304186
+        
+        try:
+            # Подключаемся к Google Sheets
+            client = gspread.service_account(filename=config.GOOGLE_CREDENTIALS_FILE)
+            
+            # Открываем таблицу меню
+            menu_sheet = client.open(config.MENU_SHEET_NAME).get_worksheet_by_id(TODAY_MENU_SHEET_ID)
+            if not menu_sheet:
+                message = "Не удалось загрузить меню на сегодня."
+                keyboard = [[InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                if is_callback:
+                    await update.callback_query.edit_message_text(text=message, reply_markup=reply_markup)
+                else:
+                    await temp_message.edit_text(text=message, reply_markup=reply_markup)
+                return MENU
+            
+            # Получаем текущую дату в формате дд.мм.гг
+            today = datetime.now().strftime("%d.%m.%y")
+            
+            # Получаем все строки из листа
+            rows = menu_sheet.get_all_values()
+            
+            # Ищем строку с сегодняшней датой
+            today_menu_row = None
+            for row in rows:
+                if row and row[0].strip() == today:
+                    today_menu_row = row
+                    break
+            
+            if not today_menu_row:
+                message = "Меню на сегодня не найдено."
+                keyboard = [[InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                if is_callback:
+                    await update.callback_query.edit_message_text(text=message, reply_markup=reply_markup)
+                else:
+                    await temp_message.edit_text(text=message, reply_markup=reply_markup)
+                return MENU
+            
+            # Формируем сообщение с меню
+            message = f"🍽️ Меню на сегодня ({today}):\n\n"
+            
+            # Получаем названия блюд из диапазона колонок с 3 по 41
+            dishes = [dish.strip() for dish in today_menu_row[2:41] if dish.strip()]
+            
+            # Получаем информацию о составе и калорийности для каждого блюда
+            if dishes:
+                for dish in dishes:
+                    composition_info = get_dish_composition(dish)
+                    message += f"*{dish}*\n"
+                    if composition_info['composition']:
+                        message += f"{composition_info['composition']}\n"
+                    else:
+                        message += "Состав не указан\n"
+                    if composition_info['calories']:
+                        message += f"_{composition_info['calories']} ккал_\n"
+                    message += "\n"
+            else:
+                message += "Нет доступных блюд на сегодня.\n"
+            
+            # Кнопки навигации
+            keyboard = [[InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            # Отправляем сообщение
+            try:
+                if is_callback:
+                    await update.callback_query.edit_message_text(text=message, reply_markup=reply_markup, parse_mode='Markdown')
+                else:
+                    await temp_message.edit_text(text=message, reply_markup=reply_markup, parse_mode='Markdown')
+            except Exception as e:
+                logger.error(f"Ошибка при отправке меню на сегодня: {e}")
+                try:
+                    if is_callback:
+                        await update.callback_query.edit_message_text(
+                            text=translations.get_message('error_loading_menu'), 
+                            reply_markup=InlineKeyboardMarkup([[
+                                InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')
+                            ]])
+                        )
+                    else:
+                        await update.message.reply_text(
+                            text=translations.get_message('error_loading_menu'),
+                            reply_markup=InlineKeyboardMarkup([[
+                                InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')
+                            ]])
+                        )
+                except:
+                    pass
+        except Exception as e:
+            logger.error(f"Ошибка при работе с Google Sheets: {e}")
+            message = "Произошла ошибка при получении данных из таблицы."
+            keyboard = [[InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            if is_callback:
+                await update.callback_query.edit_message_text(text=message, reply_markup=reply_markup)
+            else:
+                await temp_message.edit_text(text=message, reply_markup=reply_markup)
+            
+        return MENU
+    except Exception as e:
+        # Глобальная обработка ошибок
+        logger.error(f"Критическая ошибка при показе меню на сегодня: {e}")
+        try:
+            # Пытаемся отправить сообщение об ошибке
+            error_message = translations.get_message('error_loading_menu')
+            keyboard = [
+                [InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            if update.callback_query:
+                await update.callback_query.edit_message_text(
+                    text=error_message, 
+                    reply_markup=reply_markup
+                )
+            elif update.message:
+                await update.message.reply_text(
+                    text=error_message,
                     reply_markup=reply_markup
                 )
         except:

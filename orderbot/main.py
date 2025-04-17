@@ -10,7 +10,7 @@ from telegram.ext import (
     filters
 )
 from telegram import Update
-from .handlers.menu import start, show_tomorrow_menu, show_dish_compositions, back_to_main_menu
+from .handlers.menu import start, show_tomorrow_menu, show_dish_compositions, back_to_main_menu, show_today_menu
 from .handlers.order import (
     PHONE, MENU, ROOM, NAME, MEAL_TYPE, 
     DISH_SELECTION, WISHES, QUESTION,
@@ -83,12 +83,16 @@ async def main() -> None:
         # Добавляем обработчик команды /kitchen для повара
         application.add_handler(CommandHandler('kitchen', kitchen_summary))
         
+        # Добавляем обработчик команды /today для просмотра меню на сегодня
+        application.add_handler(CommandHandler('today', show_today_menu))
+        
         conv_handler = ConversationHandler(
             entry_points=[
                 CommandHandler('start', auth_start),
                 CommandHandler('myorders', show_user_orders),
                 CommandHandler('new', start_new_order),
-                CommandHandler('menu', show_tomorrow_menu)
+                CommandHandler('menu', show_tomorrow_menu),
+                CommandHandler('today', show_today_menu)
             ],
             states={
                 PHONE: [
