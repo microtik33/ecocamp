@@ -42,7 +42,11 @@ async def start(update, context):
     
     # Проверяем, авторизован ли пользователь
     if is_user_authorized(user_id):
-        # Если пользователь уже авторизован, показываем основное меню
+        # Если пользователь уже авторизован, обновляем список команд
+        is_cook = is_user_cook(user_id)
+        await setup_commands_for_user(context.bot, int(user_id), is_cook)
+        
+        # Показываем основное меню
         keyboard = [
             [InlineKeyboardButton(translations.get_button('make_order'), callback_data='new_order')],
             [InlineKeyboardButton(translations.get_button('tomorrow_menu'), callback_data='tomorrow_menu')],
