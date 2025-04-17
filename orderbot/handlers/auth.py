@@ -1,9 +1,36 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, BotCommand
 from .. import translations
 from ..services.sheets import is_user_authorized, check_phone, save_user_id, is_user_cook
 from ..services.user import update_user_info
 from .states import PHONE, MENU
-from ..main import setup_commands_for_user
+
+async def setup_commands_for_user(bot, user_id=None, is_cook=False):
+    """Настраивает команды бота для конкретного пользователя или глобально.
+    
+    Args:
+        bot: Экземпляр бота
+        user_id: ID пользователя или None для глобальных команд
+        is_cook: Флаг, указывающий, является ли пользователь поваром
+    """
+    # Базовые команды для всех пользователей
+    commands = [
+        BotCommand("start", "начать работу с ботом"),
+        BotCommand("menu", "меню на завтра"),
+        BotCommand("today", "меню на сегодня"),
+        BotCommand("new", "новый заказ"),
+        BotCommand("myorders", "мои заказы")
+    ]
+    
+    # Добавляем команду для поваров
+    if is_cook:
+        commands.append(BotCommand("kitchen", "сводка по заказам для повара"))
+    
+    # Если указан user_id, устанавливаем команды для конкретного пользователя
+    # Иначе устанавливаем глобальные команды
+    if user_id:
+        await bot.set_my_commands(commands, scope={"type": "chat", "chat_id": user_id})
+    else:
+        await bot.set_my_commands(commands)
 
 async def start(update, context):
     """Начало работы с ботом."""

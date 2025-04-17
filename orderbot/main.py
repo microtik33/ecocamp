@@ -9,7 +9,7 @@ from telegram.ext import (
     MessageHandler,
     filters
 )
-from telegram import Update, BotCommand
+from telegram import Update
 from .handlers.menu import start, show_tomorrow_menu, show_dish_compositions, back_to_main_menu, show_today_menu
 from .handlers.order import (
     PHONE, MENU, ROOM, NAME, MEAL_TYPE, 
@@ -29,7 +29,7 @@ from .handlers.order import (
     show_edit_active_orders,
     start_new_order
 )
-from .handlers.auth import start as auth_start, handle_phone
+from .handlers.auth import start as auth_start, handle_phone, setup_commands_for_user
 from .handlers.kitchen import kitchen_summary
 from .tasks import start_status_update_task, stop_status_update_task, schedule_daily_tasks
 import os
@@ -65,34 +65,6 @@ async def keep_alive():
             except Exception as e:
                 logging.error(f"Ошибка в keep_alive: {e}")
                 await asyncio.sleep(60)  # При ошибке ждем 1 минуту перед повторной попыткой
-
-async def setup_commands_for_user(bot, user_id=None, is_cook=False):
-    """Настраивает команды бота для конкретного пользователя или глобально.
-    
-    Args:
-        bot: Экземпляр бота
-        user_id: ID пользователя или None для глобальных команд
-        is_cook: Флаг, указывающий, является ли пользователь поваром
-    """
-    # Базовые команды для всех пользователей
-    commands = [
-        BotCommand("start", "начать работу с ботом"),
-        BotCommand("menu", "меню на завтра"),
-        BotCommand("today", "меню на сегодня"),
-        BotCommand("new", "новый заказ"),
-        BotCommand("myorders", "мои заказы")
-    ]
-    
-    # Добавляем команду для поваров
-    if is_cook:
-        commands.append(BotCommand("kitchen", "сводка по заказам для повара"))
-    
-    # Если указан user_id, устанавливаем команды для конкретного пользователя
-    # Иначе устанавливаем глобальные команды
-    if user_id:
-        await bot.set_my_commands(commands, scope={"type": "chat", "chat_id": user_id})
-    else:
-        await bot.set_my_commands(commands)
 
 async def main() -> None:
     """Запуск бота."""
