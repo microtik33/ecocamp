@@ -7,7 +7,8 @@ import pytz
 from .services.sheets import (
     update_orders_status, 
     force_update_menu_cache,
-    force_update_composition_cache
+    force_update_composition_cache,
+    force_update_today_menu_cache
 )
 from .services.records import process_daily_orders
 
@@ -93,10 +94,11 @@ async def process_daily_tasks():
 
 async def schedule_daily_tasks():
     """Планировщик ежедневных задач."""
-    logging.info("Запуск планировщика ежедневных задач")
+    logging.info("Запущен планировщик ежедневных задач")
     while True:
-        # Получаем текущее время
-        now = datetime.now()
+        # Получаем текущее время в московской зоне
+        moscow_tz = pytz.timezone('Europe/Moscow')
+        now = datetime.now(moscow_tz)
         current_time = now.time()
         logging.info(f"Текущее время: {current_time.strftime('%H:%M:%S')}")
         
@@ -118,18 +120,21 @@ async def schedule_daily_tasks():
             except Exception as e:
                 logging.error(f"Ошибка при обработке заказов: {e}")
         
-        # Если сейчас 9:59 - обновляем кэш меню
+        # Если сейчас 9:59 - обновляем кэши
         elif current_time.hour == 9 and current_time.minute == 59:
-            logging.info("Наступило 9:59, начинаем обновление меню")
-            # Принудительно обновляем кэш меню и составов
+            logging.info("Наступило 9:59, начинаем обновление кэшей")
+            # Принудительно обновляем кэши
             try:
                 await force_update_menu_cache()
-                logging.info("Кэш меню принудительно обновлен")
+                logging.info("Кэш меню на завтра принудительно обновлен")
                 
                 await force_update_composition_cache()
                 logging.info("Кэш составов блюд принудительно обновлен")
+                
+                await force_update_today_menu_cache()
+                logging.info("Кэш меню на сегодня принудительно обновлен")
             except Exception as e:
-                logging.error(f"Ошибка при обновлении кэша: {e}")
+                logging.error(f"Ошибка при обновлении кэшей: {e}")
         else:
             logging.info(f"Не время для выполнения задач (сейчас {current_time.hour:02d}:{current_time.minute:02d}), пропускаем обработку")
         

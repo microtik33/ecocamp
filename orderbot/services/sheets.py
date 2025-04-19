@@ -23,6 +23,7 @@ REC_SHEET_ID = 1331625926
 AUTH_SHEET_ID = 66851994
 MENU_SHEET_ID = 1181156289
 COMPOSITION_SHEET_ID = 1127521486  # ID листа с составом блюд
+TODAY_MENU_SHEET_ID = 1169304186   # ID листа с меню на сегодня
 
 @profile_time
 def get_orders_sheet():
@@ -570,6 +571,67 @@ async def force_update_composition_cache():
     Рекомендуется вызывать эту функцию вместе с обновлением кэша меню.
     """
     _update_composition_cache(force=True)
+    return True
+
+# Кэш для меню на сегодня
+_today_menu_cache = {}
+_last_today_menu_update = None
+_TODAY_MENU_CACHE_TTL = 86400  # 24 часа в секундах
+
+@profile_time
+def _update_today_menu_cache(force=False):
+    """Обновление кэша меню на сегодня.
+    
+    Args:
+        force: Если True, принудительно обновляет кэш, игнорируя время последнего обновления.
+    """
+    global _last_today_menu_update, _today_menu_cache
+    current_time = datetime.now().timestamp()
+    
+    # Если кэш пустой или устарел, или требуется принудительное обновление
+    if force or not _last_today_menu_update or (current_time - _last_today_menu_update) > _TODAY_MENU_CACHE_TTL:
+        try:
+            # Получаем листа с меню на сегодня
+            menu_sheet = client.open_by_key(config.MENU_SHEET_ID).get_worksheet_by_id(TODAY_MENU_SHEET_ID)
+            
+            if not menu_sheet:
+                logging.error("Не удалось получить лист с меню на сегодня")
+                return
+                
+            # Получаем текущую дату в формате дд.мм.гг
+            today = datetime.now().strftime("%d.%m.%y")
+            
+            # Получаем все строки из листа
+            rows = menu_sheet.get_all_values()
+            
+            # Ищем строку с сегодняшней датой
+            today_menu_row = None
+            for row in rows:
+                if row and row[0].strip() == today:
+                    today_menu_row = row
+                    break
+            
+            if today_menu_row:
+                # Получаем названия блюд из диапазона колонок с 3 по 41
+                dishes = [dish.strip() for dish in today_menu_row[2:41] if dish.strip()]
+                _today_menu_cache["dishes"] = dishes
+                _last_today_menu_update = current_time
+                logging.info(f"Кэш меню на сегодня обновлен в {datetime.fromtimestamp(current_time).strftime('%Y-%m-%d %H:%M:%S')}")
+            else:
+                logging.info(f"Меню на сегодня ({today}) не найдено в таблице")
+                _today_menu_cache["dishes"] = []
+                _last_today_menu_update = current_time
+        except Exception as e:
+            logging.error(f"Ошибка при обновлении кэша меню на сегодня: {e}")
+
+def get_today_menu_dishes():
+    """Получение списка блюд из меню на сегодня."""
+    _update_today_menu_cache()
+    return _today_menu_cache.get("dishes", [])
+
+async def force_update_today_menu_cache():
+    """Принудительно обновляет кэш меню на сегодня."""
+    _update_today_menu_cache(force=True)
     return True
 
 # Инициализация листов

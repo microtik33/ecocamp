@@ -5,7 +5,7 @@ from ..services.user import update_user_info
 from ..utils.time_utils import is_order_time, is_menu_available_time
 from ..utils.auth_decorator import require_auth
 from .order import MENU
-from ..services.sheets import get_dishes_for_meal, get_dish_composition
+from ..services.sheets import get_dishes_for_meal, get_dish_composition, get_today_menu_dishes
 from datetime import datetime, timedelta
 import logging
 import gspread
@@ -397,40 +397,11 @@ async def show_today_menu(update: telegram.Update, context: telegram.ext.Context
             else:
                 temp_message = await update.message.reply_text("...")
         
-        # ID листа с меню на сегодня
-        TODAY_MENU_SHEET_ID = 1169304186
-        
         try:
-            # Подключаемся к Google Sheets
-            client = gspread.service_account(filename=config.GOOGLE_CREDENTIALS_FILE)
+            # Получаем блюда из кэша меню на сегодня
+            dishes = get_today_menu_dishes()
             
-            # Открываем таблицу меню
-            menu_sheet = client.open_by_key(config.MENU_SHEET_ID).get_worksheet_by_id(TODAY_MENU_SHEET_ID)
-            if not menu_sheet:
-                message = "Не удалось загрузить меню на сегодня."
-                keyboard = [[InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                
-                if is_callback:
-                    await update.callback_query.edit_message_text(text=message, reply_markup=reply_markup)
-                else:
-                    await temp_message.edit_text(text=message, reply_markup=reply_markup)
-                return MENU
-            
-            # Получаем текущую дату в формате дд.мм.гг
-            today = datetime.now().strftime("%d.%m.%y")
-            
-            # Получаем все строки из листа
-            rows = menu_sheet.get_all_values()
-            
-            # Ищем строку с сегодняшней датой
-            today_menu_row = None
-            for row in rows:
-                if row and row[0].strip() == today:
-                    today_menu_row = row
-                    break
-            
-            if not today_menu_row:
+            if not dishes:
                 message = "Меню на сегодня не найдено."
                 keyboard = [[InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
@@ -444,9 +415,6 @@ async def show_today_menu(update: telegram.Update, context: telegram.ext.Context
             # Формируем сообщение с меню
             today_display = datetime.now().strftime("%d.%m")
             message = f"🍽️ Меню на сегодня ({today_display}):\n\n"
-            
-            # Получаем названия блюд из диапазона колонок с 3 по 41
-            dishes = [dish.strip() for dish in today_menu_row[2:41] if dish.strip()]
             
             # Получаем информацию о составе и калорийности для каждого блюда
             if dishes:
@@ -493,8 +461,8 @@ async def show_today_menu(update: telegram.Update, context: telegram.ext.Context
                 except:
                     pass
         except Exception as e:
-            logger.error(f"Ошибка при работе с Google Sheets: {e}")
-            message = "Произошла ошибка при получении данных из таблицы."
+            logger.error(f"Ошибка при получении данных из кэша меню на сегодня: {e}")
+            message = "Произошла ошибка при получении данных из кэша меню."
             keyboard = [[InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
