@@ -533,46 +533,100 @@ async def update_caches(update: telegram.Update, context: telegram.ext.ContextTy
     # Отправляем промежуточное сообщение
     processing_message = await update.message.reply_text("⏳ Обновление кэшей меню...\n\n1. Меню на завтра... ⏳\n2. Составы блюд... ⏳\n3. Меню на сегодня... ⏳")
     
+    menu_time = 0
+    comp_time = 0
+    today_time = 0
+    has_error = False
+    error_message_text = ""
+    
     try:
         # Обновляем кэш меню на завтра
         start_time_menu = datetime.now()
-        await force_update_menu_cache()
-        menu_time = (datetime.now() - start_time_menu).total_seconds()
-        
-        # Обновляем сообщение с прогрессом
-        await processing_message.edit_text(
-            f"⏳ Обновление кэшей меню...\n\n1. Меню на завтра... ✅ ({menu_time:.1f} сек)\n2. Составы блюд... ⏳\n3. Меню на сегодня... ⏳"
-        )
+        try:
+            await force_update_menu_cache()
+            menu_time = (datetime.now() - start_time_menu).total_seconds()
+            
+            # Обновляем сообщение с прогрессом
+            await processing_message.edit_text(
+                f"⏳ Обновление кэшей меню...\n\n1. Меню на завтра... ✅ ({menu_time:.1f} сек)\n2. Составы блюд... ⏳\n3. Меню на сегодня... ⏳"
+            )
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении кэша меню на завтра: {e}")
+            has_error = True
+            error_message_text += f"Ошибка при обновлении кэша меню на завтра: {str(e)}\n"
+            await processing_message.edit_text(
+                f"⏳ Обновление кэшей меню...\n\n1. Меню на завтра... ❌ (ошибка)\n2. Составы блюд... ⏳\n3. Меню на сегодня... ⏳"
+            )
         
         # Обновляем кэш составов блюд
         start_time_comp = datetime.now()
-        await force_update_composition_cache()
-        comp_time = (datetime.now() - start_time_comp).total_seconds()
-        
-        # Обновляем сообщение с прогрессом
-        await processing_message.edit_text(
-            f"⏳ Обновление кэшей меню...\n\n1. Меню на завтра... ✅ ({menu_time:.1f} сек)\n2. Составы блюд... ✅ ({comp_time:.1f} сек)\n3. Меню на сегодня... ⏳"
-        )
+        try:
+            await force_update_composition_cache()
+            comp_time = (datetime.now() - start_time_comp).total_seconds()
+            
+            # Обновляем сообщение с прогрессом
+            status_menu = "✅" if not has_error else "❌"
+            await processing_message.edit_text(
+                f"⏳ Обновление кэшей меню...\n\n1. Меню на завтра... {status_menu} ({menu_time:.1f} сек)\n2. Составы блюд... ✅ ({comp_time:.1f} сек)\n3. Меню на сегодня... ⏳"
+            )
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении кэша составов блюд: {e}")
+            has_error = True
+            error_message_text += f"Ошибка при обновлении кэша составов блюд: {str(e)}\n"
+            status_menu = "✅" if not has_error else "❌"
+            await processing_message.edit_text(
+                f"⏳ Обновление кэшей меню...\n\n1. Меню на завтра... {status_menu} ({menu_time:.1f} сек)\n2. Составы блюд... ❌ (ошибка)\n3. Меню на сегодня... ⏳"
+            )
         
         # Обновляем кэш меню на сегодня
         start_time_today = datetime.now()
-        await force_update_today_menu_cache()
-        today_time = (datetime.now() - start_time_today).total_seconds()
-        
-        # Формируем сообщение об успешном обновлении
-        total_time = menu_time + comp_time + today_time
-        success_message = (
-            "✅ Кэши успешно обновлены:\n\n"
-            f"1. Меню на завтра... ✅ ({menu_time:.1f} сек)\n"
-            f"2. Составы блюд... ✅ ({comp_time:.1f} сек)\n"
-            f"3. Меню на сегодня... ✅ ({today_time:.1f} сек)\n\n"
-            f"⏱ Общее время: {total_time:.1f} сек\n"
-            f"🕒 {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}"
-        )
-        
-        # Обновляем промежуточное сообщение
-        await processing_message.edit_text(success_message)
-        
+        try:
+            await force_update_today_menu_cache()
+            today_time = (datetime.now() - start_time_today).total_seconds()
+            
+            status_menu = "✅" if not has_error else "❌"
+            status_comp = "✅" if comp_time > 0 else "❌"
+            
+            if has_error:
+                # Если были ошибки, отображаем их
+                message = (
+                    f"⚠️ Обновление кэшей выполнено с ошибками:\n\n"
+                    f"1. Меню на завтра... {status_menu} ({menu_time:.1f} сек)\n"
+                    f"2. Составы блюд... {status_comp} ({comp_time:.1f} сек)\n"
+                    f"3. Меню на сегодня... ✅ ({today_time:.1f} сек)\n\n"
+                    f"⚠️ Ошибки при обновлении:\n{error_message_text}\n"
+                    f"🕒 {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}"
+                )
+                await processing_message.edit_text(message)
+            else:
+                # Формируем сообщение об успешном обновлении
+                total_time = menu_time + comp_time + today_time
+                success_message = (
+                    "✅ Кэши успешно обновлены:\n\n"
+                    f"1. Меню на завтра... ✅ ({menu_time:.1f} сек)\n"
+                    f"2. Составы блюд... ✅ ({comp_time:.1f} сек)\n"
+                    f"3. Меню на сегодня... ✅ ({today_time:.1f} сек)\n\n"
+                    f"⏱ Общее время: {total_time:.1f} сек\n"
+                    f"🕒 {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}"
+                )
+                await processing_message.edit_text(success_message)
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении кэша меню на сегодня: {e}")
+            has_error = True
+            error_message_text += f"Ошибка при обновлении кэша меню на сегодня: {str(e)}\n"
+            
+            status_menu = "✅" if not has_error else "❌"
+            status_comp = "✅" if comp_time > 0 else "❌"
+            
+            message = (
+                f"⚠️ Обновление кэшей выполнено с ошибками:\n\n"
+                f"1. Меню на завтра... {status_menu} ({menu_time:.1f} сек)\n"
+                f"2. Составы блюд... {status_comp} ({comp_time:.1f} сек)\n"
+                f"3. Меню на сегодня... ❌ (ошибка)\n\n"
+                f"⚠️ Ошибки при обновлении:\n{error_message_text}\n"
+                f"🕒 {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}"
+            )
+            await processing_message.edit_text(message)
     except Exception as e:
         # Логируем ошибку
         logger.error(f"Ошибка при обновлении кэшей: {e}")
