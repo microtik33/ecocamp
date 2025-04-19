@@ -641,3 +641,29 @@ async def update_caches(update: telegram.Update, context: telegram.ext.ContextTy
         await processing_message.edit_text(error_message)
     
     return MENU 
+
+async def force_update_menu_cache():
+    """
+    Принудительно обновляет кэш меню на завтра.
+    
+    Returns:
+        bool: True в случае успешного обновления
+    """
+    # Обновляем кэш меню (очищаем его, чтобы заставить загрузить новые данные)
+    get_dishes_for_meal.cache_clear()
+    
+    # Запрашиваем все блюда для каждого приема пищи, чтобы заполнить кэш
+    # Это заставит функцию get_dishes_for_meal загрузить новые данные
+    breakfast_dishes = get_dishes_for_meal('breakfast')
+    lunch_dishes = get_dishes_for_meal('lunch')
+    dinner_dishes = get_dishes_for_meal('dinner')
+    
+    # Проверяем, что данные загружены
+    if breakfast_dishes or lunch_dishes or dinner_dishes:
+        logger.info(f"Кэш меню обновлен: завтрак ({len(breakfast_dishes)} блюд), "
+                   f"обед ({len(lunch_dishes)} блюд), "
+                   f"ужин ({len(dinner_dishes)} блюд)")
+        return True
+    else:
+        logger.warning("Не удалось обновить кэш меню. Данные не загружены.")
+        return False 

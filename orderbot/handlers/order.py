@@ -405,12 +405,6 @@ async def handle_dish_selection(update: telegram.Update, context: telegram.ext.C
         order['quantities'][dish] = 1
         if dish not in order['dishes']:
             order['dishes'].append(dish)
-            # Получаем цену из кэша
-            dishes_with_prices = get_dishes_for_meal(order['meal_type'])
-            for d, p, w in dishes_with_prices:
-                if d == dish:
-                    order['prices'][dish] = p
-                    break
         
         # Обновляем отображение формы заказа
         order_message = await show_order_form(update, context)

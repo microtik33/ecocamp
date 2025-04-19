@@ -509,14 +509,14 @@ def save_user_id(phone: str, user_id: str) -> bool:
         return False
 
 async def force_update_menu_cache():
-    """Принудительно обновляет кэш меню.
+    """
+    Принудительно обновляет кэш меню.
     
     Рекомендуется вызывать эту функцию раз в день в полночь.
     """
     _update_menu_cache(force=True)
-    # Очищаем кэш функции get_dishes_for_meal, если он использует декоратор lru_cache
-    if hasattr(get_dishes_for_meal, 'cache_clear'):
-        get_dishes_for_meal.cache_clear()
+    # Очищаем кэш функции get_dishes_for_meal
+    get_dishes_for_meal.cache_clear()
     return True
 
 # Кэш для составов блюд
