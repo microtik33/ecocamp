@@ -165,29 +165,29 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
             # Добавляем красный эмодзи для отмененных заказов
             status_emoji = "🔴" if is_cancelled else ""
             
-            # Формируем сообщение с информацией о заказе в новом формате
-            message = f"Заказ №{order_found[0]}\n\n"
-            message += f"Статус: {status_emoji} {order_found[2]}\n\n"
-            message += f"Комната: {order_found[6]}\n"
-            message += f"Имя: {order_found[7]}\n"
-            message += f"Время дня: {translations.get_meal_type(order_found[8])}\n"
+            # Формируем сообщение с информацией о заказе в новом формате с эмодзи
+            message = f"🔢 Заказ №{order_found[0]}\n\n"
+            message += f"⏰ Статус: {status_emoji} {order_found[2]}\n\n"
+            message += f"🏠 Комната: {order_found[6]}\n"
+            message += f"👤 Имя: {order_found[7]}\n"
+            message += f"🍽 Время дня: {translations.get_meal_type(order_found[8])}\n"
             
             # Подготавливаем блюда для отображения
             dishes_list = []
             if order_found[9]:
                 dishes = order_found[9].split(',')
-                dishes_text = "Блюда:\n"
+                dishes_text = "🍲 Блюда:\n"
                 for dish in dishes:
                     dish = dish.strip()
                     dishes_text += f"- {dish}\n"
                 dishes_list.append(dishes_text)
             else:
-                dishes_list.append("Блюда: -\n")
+                dishes_list.append("🍲 Блюда: -\n")
             
             # Добавляем пожелания и дату выдачи
-            additional_info = f"Пожелания: {order_found[10] if order_found[10] and order_found[10] != '—' else '-'}\n"
-            additional_info += f"Дата выдачи: {order_found[11]}\n\n"
-            additional_info += f"Время заказа: {order_found[1]}"
+            additional_info = f"📝 Пожелания: {order_found[10] if order_found[10] and order_found[10] != '—' else '-'}\n"
+            additional_info += f"📅 Дата выдачи: {order_found[11]}\n\n"
+            additional_info += f"📨 Время заказа: {order_found[1]}"
             
             # Добавляем информацию, относится ли заказ к текущей сводке
             if not is_today_order:
@@ -209,7 +209,7 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
                 await update.message.reply_text(first_message)
                 
                 # Отправляем списки блюд частями
-                current_dishes = "Блюда:\n"
+                current_dishes = "🍲 Блюда:\n"
                 dishes = order_found[9].split(',')
                 
                 for i, dish in enumerate(dishes):
@@ -218,11 +218,11 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
                     
                     if len(current_dishes) + len(dish_line) > MAX_MESSAGE_LENGTH:
                         await update.message.reply_text(current_dishes)
-                        current_dishes = "Блюда (продолжение):\n" + dish_line
+                        current_dishes = "🍲 Блюда (продолжение):\n" + dish_line
                     else:
                         current_dishes += dish_line
                 
-                if current_dishes and current_dishes != "Блюда:\n" and current_dishes != "Блюда (продолжение):\n":
+                if current_dishes and current_dishes != "🍲 Блюда:\n" and current_dishes != "🍲 Блюда (продолжение):\n":
                     await update.message.reply_text(current_dishes)
                 
                 # Отправляем дополнительную информацию
@@ -296,14 +296,25 @@ async def find_orders_by_room(update: Update, context: ContextTypes.DEFAULT_TYPE
             # Максимальная длина сообщения в Telegram
             MAX_MESSAGE_LENGTH = 4000
             
-            # Формируем сообщения с заказами
+            # Формируем сообщения с заказами в новом формате
             for order in room_orders:
+                # Изменяем порядок отображения информации о заказе
                 order_text = f"🔢 Заказ №{order[0]}\n"
                 order_text += f"👤 Имя: {order[7]}\n"
                 order_text += f"🍽 Время дня: {translations.get_meal_type(order[8])}\n"
-                order_text += f"🍲 Блюда: {order[9]}\n"
+                
+                # Добавляем блюда с разбивкой на отдельные строки
+                if order[9]:
+                    order_text += "🍲 Блюда:\n"
+                    dishes = order[9].split(',')
+                    for dish in dishes:
+                        dish = dish.strip()
+                        order_text += f"- {dish}\n"
+                else:
+                    order_text += "🍲 Блюда: -\n"
+                
+                # Добавляем пожелания
                 order_text += f"📝 Пожелания: {order[10] if order[10] and order[10] != '—' else '-'}\n"
-                order_text += f"⏰ Статус: {order[2]}\n"
                 order_text += "─" * 30 + "\n"
                 
                 # Проверяем, поместится ли заказ в текущее сообщение
