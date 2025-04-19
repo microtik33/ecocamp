@@ -29,8 +29,8 @@ from .handlers.order import (
     show_edit_active_orders,
     start_new_order
 )
-from .handlers.auth import start as auth_start, handle_phone, setup_commands_for_user
-from .handlers.kitchen import kitchen_summary
+from .handlers.auth import auth_start, handle_phone, setup_commands_for_user
+from .handlers.kitchen import kitchen_summary, search_orders_by_room, search_orders_by_number, find_orders_by_room, back_to_kitchen, handle_order_number_input
 from .handlers.stats import performance_stats, clear_performance_stats, memory_stats, function_stats
 from .tasks import start_status_update_task, stop_status_update_task, schedule_daily_tasks
 import os
@@ -93,6 +93,18 @@ async def main() -> None:
 
         # Добавляем обработчик команды /kitchen для повара
         application.add_handler(CommandHandler('kitchen', kitchen_summary))
+        
+        # Добавляем обработчики для поиска заказов
+        application.add_handler(CallbackQueryHandler(search_orders_by_room, pattern="search_by_room"))
+        application.add_handler(CallbackQueryHandler(search_orders_by_number, pattern="search_by_number"))
+        application.add_handler(CallbackQueryHandler(find_orders_by_room, pattern="^find_room:[0-9]+$"))
+        application.add_handler(CallbackQueryHandler(back_to_kitchen, pattern="back_to_kitchen"))
+        
+        # Добавляем обработчик для текстового ввода номера заказа
+        application.add_handler(MessageHandler(
+            filters.TEXT & ~filters.COMMAND & ~filters.Regex(r'^\/.*') & filters.Regex(r'^\d+$'),
+            handle_order_number_input
+        ), group=1)
         
         # Добавляем обработчик команды /today для просмотра меню на сегодня
         application.add_handler(CommandHandler('today', show_today_menu))
