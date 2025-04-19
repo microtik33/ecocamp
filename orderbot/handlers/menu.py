@@ -531,20 +531,42 @@ async def update_caches(update: telegram.Update, context: telegram.ext.ContextTy
         return MENU
     
     # Отправляем промежуточное сообщение
-    processing_message = await update.message.reply_text("⏳ Обновление кэшей меню...")
+    processing_message = await update.message.reply_text("⏳ Обновление кэшей меню...\n\n1. Меню на завтра... ⏳\n2. Составы блюд... ⏳\n3. Меню на сегодня... ⏳")
     
     try:
-        # Обновляем все кэши
+        # Обновляем кэш меню на завтра
+        start_time_menu = datetime.now()
         await force_update_menu_cache()
+        menu_time = (datetime.now() - start_time_menu).total_seconds()
+        
+        # Обновляем сообщение с прогрессом
+        await processing_message.edit_text(
+            f"⏳ Обновление кэшей меню...\n\n1. Меню на завтра... ✅ ({menu_time:.1f} сек)\n2. Составы блюд... ⏳\n3. Меню на сегодня... ⏳"
+        )
+        
+        # Обновляем кэш составов блюд
+        start_time_comp = datetime.now()
         await force_update_composition_cache()
+        comp_time = (datetime.now() - start_time_comp).total_seconds()
+        
+        # Обновляем сообщение с прогрессом
+        await processing_message.edit_text(
+            f"⏳ Обновление кэшей меню...\n\n1. Меню на завтра... ✅ ({menu_time:.1f} сек)\n2. Составы блюд... ✅ ({comp_time:.1f} сек)\n3. Меню на сегодня... ⏳"
+        )
+        
+        # Обновляем кэш меню на сегодня
+        start_time_today = datetime.now()
         await force_update_today_menu_cache()
+        today_time = (datetime.now() - start_time_today).total_seconds()
         
         # Формируем сообщение об успешном обновлении
+        total_time = menu_time + comp_time + today_time
         success_message = (
             "✅ Кэши успешно обновлены:\n\n"
-            "- Меню на завтра\n"
-            "- Составы блюд\n"
-            "- Меню на сегодня\n\n"
+            f"1. Меню на завтра... ✅ ({menu_time:.1f} сек)\n"
+            f"2. Составы блюд... ✅ ({comp_time:.1f} сек)\n"
+            f"3. Меню на сегодня... ✅ ({today_time:.1f} сек)\n\n"
+            f"⏱ Общее время: {total_time:.1f} сек\n"
             f"🕒 {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}"
         )
         

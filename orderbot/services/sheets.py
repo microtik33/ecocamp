@@ -514,6 +514,8 @@ async def force_update_menu_cache():
     Рекомендуется вызывать эту функцию раз в день в полночь.
     """
     _update_menu_cache(force=True)
+    # Очищаем кэш функции get_dishes_for_meal
+    get_dishes_for_meal.cache_clear()
     return True
 
 # Кэш для составов блюд
@@ -571,6 +573,9 @@ async def force_update_composition_cache():
     Рекомендуется вызывать эту функцию вместе с обновлением кэша меню.
     """
     _update_composition_cache(force=True)
+    # Очищаем кэш функции get_dish_composition, если он использует lru_cache
+    if hasattr(get_dish_composition, 'cache_clear'):
+        get_dish_composition.cache_clear()
     return True
 
 # Кэш для меню на сегодня
@@ -632,6 +637,9 @@ def get_today_menu_dishes():
 async def force_update_today_menu_cache():
     """Принудительно обновляет кэш меню на сегодня."""
     _update_today_menu_cache(force=True)
+    # Очищаем кэш функции get_today_menu_dishes, если он использует lru_cache
+    if hasattr(get_today_menu_dishes, 'cache_clear'):
+        get_today_menu_dishes.cache_clear()
     return True
 
 # Инициализация листов
