@@ -113,7 +113,7 @@ async def ask_room(update: telegram.Update, context: telegram.ext.ContextTypes.D
     context.user_data['order_message_id'] = sent_message.message_id
     
     # Отправляем сообщение с выбором комнаты
-    await query.message.reply_text(translations.get_message('choose_room'), reply_markup=reply_markup)
+    await query.message.reply_text(translations.get_message('choose_room'), reply_markup=reply_markup, parse_mode="MarkdownV2")
     await query.message.delete()
     return ROOM
 
@@ -1145,7 +1145,7 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
                 [InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await context.bot.send_message(chat_id=chat_id, text=translations.get_message('choose_room'), reply_markup=reply_markup)
+            await context.bot.send_message(chat_id=chat_id, text=translations.get_message('choose_room'), reply_markup=reply_markup, parse_mode="MarkdownV2")
             return ROOM
             
         elif current_state == MEAL_TYPE:
@@ -1335,7 +1335,7 @@ async def start_new_order(update: telegram.Update, context: telegram.ext.Context
         context.user_data['order_message_id'] = sent_message.message_id
         
         # Отправляем сообщение с выбором комнаты
-        await update.message.reply_text(translations.get_message('choose_room'), reply_markup=reply_markup)
+        await update.message.reply_text(translations.get_message('choose_room'), reply_markup=reply_markup, parse_mode="MarkdownV2")
         return ROOM
         
     except Exception as e:

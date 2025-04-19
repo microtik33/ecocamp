@@ -147,7 +147,7 @@ async def main() -> None:
                     CallbackQueryHandler(back_to_main_menu, pattern='back_to_menu')
                 ],
                 ROOM: [
-                    CallbackQueryHandler(ask_name, pattern='^room:[1-6]$'),
+                    CallbackQueryHandler(ask_name, pattern='^room:([1-9]|1[0-9]|20)$'),
                     CallbackQueryHandler(handle_order_update, pattern='cancel')
                 ],
                 NAME: [
