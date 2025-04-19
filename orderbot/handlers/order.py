@@ -17,7 +17,7 @@ from ..utils.profiler import profile_time
 # Настройка логгера
 logger = logging.getLogger(__name__)
 
-MAX_DISH_QUANTITY = 10
+MAX_DISH_QUANTITY = 20
 MIN_DISH_QUANTITY = 1
 
 def get_delivery_date(meal_type: str) -> datetime:
@@ -98,8 +98,10 @@ async def ask_room(update: telegram.Update, context: telegram.ext.ContextTypes.D
     
     # Формируем клавиатуру с номерами комнат
     keyboard = [
-        [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(1, 4)],
-        [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(4, 7)],
+        [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(1, 6)],
+        [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(6, 11)],
+        [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(11, 16)],
+        [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(16, 21)],
         [InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1136,8 +1138,10 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
             # Возврат к выбору комнаты
             context.user_data['state'] = ROOM
             keyboard = [
-                [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(1, 4)],
-                [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(4, 7)],
+                [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(1, 6)],
+                [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(6, 11)],
+                [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(11, 16)],
+                [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(16, 21)],
                 [InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1316,8 +1320,10 @@ async def start_new_order(update: telegram.Update, context: telegram.ext.Context
         
         # Показываем выбор комнаты
         keyboard = [
-            [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(1, 4)],
-            [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(4, 7)],
+            [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(1, 6)],
+            [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(6, 11)],
+            [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(11, 16)],
+            [InlineKeyboardButton(f"Номер {i}", callback_data=f"room:{i}") for i in range(16, 21)],
             [InlineKeyboardButton(translations.get_button('cancel'), callback_data='cancel')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
