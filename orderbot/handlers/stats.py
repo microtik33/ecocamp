@@ -5,7 +5,9 @@ import logging
 import tracemalloc
 from ..utils.profiler import get_execution_stats, clear_stats, execution_stats
 from ..services.sheets import is_user_cook
+from ..utils.auth_decorator import require_auth
 
+@require_auth
 async def performance_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Команда для получения статистики производительности бота.
@@ -89,6 +91,7 @@ async def performance_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(message, parse_mode="Markdown")
 
+@require_auth
 async def clear_performance_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Очищает собранную статистику производительности.
@@ -111,6 +114,7 @@ async def clear_performance_stats(update: Update, context: ContextTypes.DEFAULT_
     
     await update.message.reply_text("Статистика производительности очищена.")
 
+@require_auth
 async def memory_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Команда для получения статистики использования памяти ботом.
@@ -157,6 +161,7 @@ async def memory_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(message, parse_mode="Markdown")
 
+@require_auth
 async def function_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Команда для получения детальной статистики по конкретной функции.

@@ -136,6 +136,7 @@ async def back_to_main_menu(update: telegram.Update, context: telegram.ext.Conte
         return MENU
 
 @profile_time
+@require_auth
 async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Показывает меню на завтра."""
     try:
@@ -281,6 +282,7 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
         return MENU
 
 @profile_time
+@require_auth
 async def show_dish_compositions(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Показывает составы блюд из меню."""
     try:
@@ -372,6 +374,7 @@ async def show_dish_compositions(update: telegram.Update, context: telegram.ext.
         return MENU 
 
 @profile_time
+@require_auth
 async def show_today_menu(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Показывает меню на сегодня с составами и калорийностью блюд."""
     try:

@@ -65,6 +65,7 @@ async def show_order_form(update: telegram.Update, context: telegram.ext.Context
     
     return message
 
+@require_auth
 async def handle_order_time_error(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Обработка попытки сделать заказ в неправильное время."""
     query = update.callback_query
@@ -81,6 +82,7 @@ async def handle_order_time_error(update: telegram.Update, context: telegram.ext
     return MENU
 
 @profile_time
+@require_auth
 async def ask_room(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Запрос номера комнаты."""
     query = update.callback_query
@@ -155,6 +157,7 @@ async def ask_name(update: telegram.Update, context: telegram.ext.ContextTypes.D
     return NAME
 
 @profile_time
+@require_auth
 async def ask_meal_type(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Запрос типа еды."""
     context.user_data['state'] = MEAL_TYPE
@@ -263,6 +266,7 @@ def _build_dish_keyboard(
     return keyboard
 
 @profile_time
+@require_auth
 async def show_dishes(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE) -> int:
     """
     Показывает список доступных блюд и обрабатывает их выбор.
@@ -356,6 +360,7 @@ async def show_dishes(update: telegram.Update, context: telegram.ext.ContextType
     return DISH_SELECTION
 
 @profile_time
+@require_auth
 async def handle_dish_selection(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Обработка выбора блюд."""
     query = update.callback_query
@@ -698,6 +703,7 @@ async def handle_text_input(update: telegram.Update, context: telegram.ext.Conte
     return await ask_meal_type(update, context)
 
 @profile_time
+@require_auth
 async def show_user_orders(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Показ заказов пользователя."""
     # Определяем, как была вызвана функция - через команду или через кнопку
@@ -870,6 +876,7 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
     context.user_data['state'] = MENU
     return MENU
 
+@require_auth
 async def handle_question(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Обработка вопросов."""
     query = update.callback_query
@@ -898,6 +905,7 @@ async def save_question(update: telegram.Update, context: telegram.ext.ContextTy
     await update.message.reply_text(translations.get_message('question_thanks'), reply_markup=reply_markup)
     return MENU
 
+@require_auth
 async def cancel_order(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Отмена существующего заказа."""
     query = update.callback_query
@@ -1099,7 +1107,7 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
                 [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
+
             await query.edit_message_text(message, reply_markup=reply_markup)
             context.user_data.clear()
             return MENU
@@ -1244,6 +1252,7 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
     
     return MENU
 
+@require_auth
 async def show_edit_active_orders(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Показ списка активных заказов для редактирования."""
     query = update.callback_query
