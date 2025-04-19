@@ -5,7 +5,11 @@ from ..services.user import update_user_info
 from ..utils.time_utils import is_order_time, is_menu_available_time
 from ..utils.auth_decorator import require_auth
 from .order import MENU
-from ..services.sheets import get_dishes_for_meal, get_dish_composition, get_today_menu_dishes
+from ..services.sheets import (
+    get_dishes_for_meal, get_dish_composition, get_today_menu_dishes,
+    force_update_menu_cache, force_update_composition_cache, force_update_today_menu_cache,
+    is_user_cook
+)
 from datetime import datetime, timedelta
 import logging
 import gspread
@@ -500,3 +504,64 @@ async def show_today_menu(update: telegram.Update, context: telegram.ext.Context
             # Если даже отправка сообщения об ошибке не удалась, просто игнорируем
             pass
         return MENU 
+
+@profile_time
+@require_auth
+async def update_caches(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
+    """
+    Принудительно обновляет все кэши меню.
+    
+    Эта команда доступна только поварам и обновляет:
+    - Кэш меню на завтра
+    - Кэш составов блюд
+    - Кэш меню на сегодня
+    
+    Args:
+        update: Объект обновления Telegram
+        context: Контекст бота с пользовательскими данными
+    
+    Returns:
+        int: Состояние MENU для возврата в главное меню
+    """
+    user_id = str(update.effective_user.id)
+    
+    # Проверяем, является ли пользователь поваром
+    if not is_user_cook(user_id):
+        await update.message.reply_text("⛔ У вас нет прав на выполнение этой команды.")
+        return MENU
+    
+    # Отправляем промежуточное сообщение
+    processing_message = await update.message.reply_text("⏳ Обновление кэшей меню...")
+    
+    try:
+        # Обновляем все кэши
+        await force_update_menu_cache()
+        await force_update_composition_cache()
+        await force_update_today_menu_cache()
+        
+        # Формируем сообщение об успешном обновлении
+        success_message = (
+            "✅ Кэши успешно обновлены:\n\n"
+            "- Меню на завтра\n"
+            "- Составы блюд\n"
+            "- Меню на сегодня\n\n"
+            f"🕒 {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}"
+        )
+        
+        # Обновляем промежуточное сообщение
+        await processing_message.edit_text(success_message)
+        
+    except Exception as e:
+        # Логируем ошибку
+        logger.error(f"Ошибка при обновлении кэшей: {e}")
+        
+        # Формируем сообщение об ошибке
+        error_message = (
+            "❌ Произошла ошибка при обновлении кэшей.\n"
+            f"Ошибка: {str(e)}"
+        )
+        
+        # Обновляем промежуточное сообщение
+        await processing_message.edit_text(error_message)
+    
+    return MENU 

@@ -10,7 +10,7 @@ from telegram.ext import (
     filters
 )
 from telegram import Update
-from .handlers.menu import start, show_tomorrow_menu, show_dish_compositions, back_to_main_menu, show_today_menu
+from .handlers.menu import start, show_tomorrow_menu, show_dish_compositions, back_to_main_menu, show_today_menu, update_caches
 from .handlers.order import (
     PHONE, MENU, ROOM, NAME, MEAL_TYPE, 
     DISH_SELECTION, WISHES, QUESTION,
@@ -96,6 +96,9 @@ async def main() -> None:
         
         # Добавляем обработчик команды /today для просмотра меню на сегодня
         application.add_handler(CommandHandler('today', show_today_menu))
+        
+        # Добавляем обработчик команды /update для обновления кэшей меню (только для поваров)
+        application.add_handler(CommandHandler('update', update_caches))
         
         # Добавляем обработчики команд статистики
         application.add_handler(CommandHandler('stats', performance_stats))
