@@ -132,8 +132,8 @@ def _update_menu_cache(force=False):
         _last_menu_update = current_time
         logging.info(f"Кэш меню обновлен в {datetime.fromtimestamp(current_time).strftime('%Y-%m-%d %H:%M:%S')}")
 
-@profile_time
 @lru_cache(maxsize=100)
+@profile_time
 def get_dishes_for_meal(meal_type: str) -> List[Tuple[str, str, str]]:
     """Получение списка блюд с ценами и весом порций для выбранного типа еды."""
     _update_menu_cache()
@@ -515,8 +515,9 @@ async def force_update_menu_cache():
     Рекомендуется вызывать эту функцию раз в день в полночь.
     """
     _update_menu_cache(force=True)
-    # Очищаем кэш функции get_dishes_for_meal
-    get_dishes_for_meal.cache_clear()
+    # Очищаем кэш функции get_dishes_for_meal, если у неё есть метод cache_clear
+    if hasattr(get_dishes_for_meal, 'cache_clear'):
+        get_dishes_for_meal.cache_clear()
     return True
 
 # Кэш для составов блюд
