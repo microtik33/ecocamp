@@ -521,6 +521,11 @@ async def update_caches(update: telegram.Update, context: telegram.ext.ContextTy
     user = update.effective_user
     message = update.message or update.callback_query.message
     
+    # Проверяем, является ли пользователь поваром
+    if not is_user_cook(str(user.id)):
+        await message.reply_text("У вас нет доступа к этой команде.")
+        return MENU
+    
     # Отправляем сообщение о начале обновления
     processing_message = await message.reply_text(
         "⏳ Обновляю кэши меню и составов блюд...",

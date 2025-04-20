@@ -22,7 +22,7 @@ async def performance_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Проверяем права доступа (только для поваров)
     if not is_user_cook(user_id):
-        await update.message.reply_text("У вас нет прав на просмотр статистики производительности.")
+        await update.message.reply_text("У вас нет доступа к этой команде.")
         return
     
     # Получаем статистику выполнения функций
@@ -106,7 +106,7 @@ async def clear_performance_stats(update: Update, context: ContextTypes.DEFAULT_
     
     # Проверяем права доступа (только для поваров)
     if not is_user_cook(user_id):
-        await update.message.reply_text("У вас нет прав на очистку статистики производительности.")
+        await update.message.reply_text("У вас нет доступа к этой команде.")
         return
     
     # Очищаем статистику
@@ -129,7 +129,7 @@ async def memory_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Проверяем права доступа (только для поваров)
     if not is_user_cook(user_id):
-        await update.message.reply_text("У вас нет прав на просмотр статистики памяти.")
+        await update.message.reply_text("У вас нет доступа к этой команде.")
         return
     
     # Получаем текущий снимок использования памяти
@@ -179,7 +179,7 @@ async def function_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Проверяем права доступа (только для поваров)
     if not is_user_cook(user_id):
-        await update.message.reply_text("У вас нет прав на просмотр статистики производительности.")
+        await update.message.reply_text("У вас нет доступа к этой команде.")
         return
     
     if not context.args or len(context.args) == 0:
