@@ -3,6 +3,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton,
 from datetime import datetime, timedelta, date
 import logging
 from .. import translations
+from ..services import sheets
 from ..services.sheets import (
     orders_sheet, get_dishes_for_meal, get_next_order_id, 
     update_user_stats, save_order, update_order, is_user_authorized
@@ -885,35 +886,6 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
     
     # Устанавливаем состояние MENU для обработки кнопок
     context.user_data['state'] = MENU
-    return MENU
-
-@require_auth
-async def handle_question(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
-    """Обработка вопросов."""
-    query = update.callback_query
-    await query.answer()
-    
-    keyboard = [
-        [InlineKeyboardButton(translations.get_button('back'), callback_data="back")],
-        [InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await query.edit_message_text(
-        text=translations.get_message('ask_question'),
-        reply_markup=reply_markup
-    )
-    return QUESTION
-
-async def save_question(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
-    """Сохранение вопроса."""
-    keyboard = [
-        [InlineKeyboardButton("Сделать заказ", callback_data='new_order')],
-        [InlineKeyboardButton("📋 Мои заказы", callback_data='my_orders')],
-        [InlineKeyboardButton("Задать вопрос", callback_data='question')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(translations.get_message('question_thanks'), reply_markup=reply_markup)
     return MENU
 
 @require_auth

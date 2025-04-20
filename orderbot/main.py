@@ -16,7 +16,6 @@ from .handlers.order import (
     DISH_SELECTION, WISHES, QUESTION,
     ask_room,
     show_user_orders,
-    handle_question,
     cancel_order,
     ask_name,
     handle_order_update,
@@ -24,11 +23,11 @@ from .handlers.order import (
     show_dishes,
     handle_dish_selection,
     handle_text_input,
-    save_question,
     handle_order_time_error,
     show_edit_active_orders,
     start_new_order
 )
+from .handlers import handle_question, save_question
 from .handlers.auth import start as auth_start, handle_phone, setup_commands_for_user
 from .handlers.kitchen import kitchen_summary, search_orders_by_room, search_orders_by_number, find_orders_by_room, back_to_kitchen, handle_order_number_input
 from .handlers.stats import performance_stats, clear_performance_stats, memory_stats, function_stats

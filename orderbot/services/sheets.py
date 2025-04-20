@@ -24,6 +24,8 @@ AUTH_SHEET_ID = 66851994
 MENU_SHEET_ID = 1181156289
 COMPOSITION_SHEET_ID = 1127521486  # ID листа с составом блюд
 TODAY_MENU_SHEET_ID = 1169304186   # ID листа с меню на сегодня
+QUESTIONS_SHEET_ID = 1085408822    # ID листа с вопросами
+ADMINS_SHEET_ID = 497772348        # ID листа с администраторами
 
 @profile_time
 def get_orders_sheet():
@@ -98,6 +100,26 @@ def get_menu_sheet():
 def get_composition_sheet():
     """Получение листа с составом блюд."""
     return client.open_by_key(config.MENU_SHEET_ID).get_worksheet_by_id(COMPOSITION_SHEET_ID)
+
+@profile_time
+def get_questions_sheet():
+    """Получение листа вопросов."""
+    try:
+        return spreadsheet.get_worksheet_by_id(QUESTIONS_SHEET_ID)
+    except gspread.WorksheetNotFound:
+        sheet = spreadsheet.add_worksheet("Questions", 1000, 4)
+        sheet.update('A1:D1', [['Дата', 'Пользователь', 'Телефон', 'Вопрос']])
+        return sheet
+
+@profile_time
+def get_admins_sheet():
+    """Получение листа администраторов."""
+    try:
+        return spreadsheet.get_worksheet_by_id(ADMINS_SHEET_ID)
+    except gspread.WorksheetNotFound:
+        sheet = spreadsheet.add_worksheet("Admins", 100, 2)
+        sheet.update('A1:B1', [['Admin ID', 'Имя админа']])
+        return sheet
 
 # Кэш для меню
 _menu_cache: Dict[str, List[Tuple[str, str, str]]] = {}
@@ -641,6 +663,62 @@ async def force_update_today_menu_cache():
     # В текущем коде get_today_menu_dishes не использует декоратор lru_cache
     # Проверку на наличие cache_clear оставляем для будущей совместимости
     return True
+
+def get_admins_ids() -> List[str]:
+    """Получение списка ID администраторов.
+    
+    Returns:
+        List[str]: Список ID администраторов
+    """
+    try:
+        # Пропускаем заголовок и берем первый столбец
+        return get_admins_sheet().col_values(1)[1:]
+    except Exception as e:
+        logging.error(f"Ошибка при получении списка администраторов: {e}")
+        return []
+
+async def save_question(user_id: str, question_text: str) -> bool:
+    """Сохранение вопроса в таблицу.
+    
+    Args:
+        user_id: ID пользователя, задавшего вопрос
+        question_text: Текст вопроса
+        
+    Returns:
+        bool: True в случае успешного сохранения, False в противном случае
+    """
+    try:
+        # Получаем информацию о пользователе
+        username = '-'
+        profile_link = '-'
+        phone = '-'
+        
+        # Находим пользователя в таблице Users
+        users_data = get_users_sheet().get_all_values()
+        for row in users_data[1:]:  # Пропускаем заголовок
+            if row[0] == user_id:
+                profile_link = row[1]  # Profile Link
+                phone = row[4]  # Phone Number
+                break
+        
+        # Форматируем дату и время
+        now = datetime.now()
+        formatted_date = now.strftime("%d.%m.%Y %H:%M:%S")
+        
+        # Сохраняем вопрос
+        questions_sheet = get_questions_sheet()
+        questions_sheet.append_row([
+            formatted_date,  # Дата и время
+            profile_link,    # Ссылка на пользователя
+            phone,           # Телефон
+            question_text    # Текст вопроса
+        ], value_input_option='USER_ENTERED')
+        
+        logging.info(f"Вопрос от пользователя {user_id} сохранен в таблицу")
+        return True
+    except Exception as e:
+        logging.error(f"Ошибка при сохранении вопроса: {e}")
+        return False
 
 # Инициализация листов
 orders_sheet = get_orders_sheet()
