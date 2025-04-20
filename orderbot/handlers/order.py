@@ -773,11 +773,9 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
                 total_sum += order_sum
                 
                 order_info = (
-                    f"⚙️ Заказ {order[0]}\n"
-                    f"⏰ {order[1]}\n"
-                    f"👤 Имя: {order[7]}\n"
-                    f"🍽 Время дня: {meal_type_with_date}\n"
-                    f"💰 Сумма заказа: {order_sum} р.\n"
+                    f"🛎 Заказ *{order[0]}*\n"
+                    f"🍽 Время: {meal_type_with_date}\n"
+                    f"💰 Сумма: {order_sum} р.\n"
                     f"{translations.get_message('active_orders_separator')}"
                 )
                 
