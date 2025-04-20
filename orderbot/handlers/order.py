@@ -782,7 +782,6 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
                 order_info = (
                     f"🛎 Заказ *{escaped_order_id}* \\({escaped_status}\\)\n"
                     f"🍽 Время: {escaped_meal_type}\n"
-                    f"🍲 Блюда:\n"
                 )
                 order_sum = int(float(order[5])) if order[5] else 0
                 total_sum += order_sum
