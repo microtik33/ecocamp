@@ -14,6 +14,8 @@ from ..utils.auth_decorator import require_auth
 from .states import PHONE, MENU, ROOM, NAME, MEAL_TYPE, DISH_SELECTION, WISHES, QUESTION, EDIT_ORDER
 from typing import List, Tuple, Dict, Optional, Any, Union
 from ..utils.profiler import profile_time
+from ..utils.markdown_utils import escape_markdown_v2
+from telegram import ParseMode
 
 # Настройка логгера
 logger = logging.getLogger(__name__)
@@ -772,10 +774,15 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
                 order_sum = int(float(order[5])) if order[5] else 0
                 total_sum += order_sum
                 
+                # Экранируем специальные символы для Markdown V2
+                escaped_order_id = escape_markdown_v2(order[0])
+                escaped_meal_type = escape_markdown_v2(meal_type_with_date)
+                escaped_sum = escape_markdown_v2(str(order_sum))
+                
                 order_info = (
-                    f"🛎 Заказ *{order[0]}*\n"
-                    f"🍽 Время: {meal_type_with_date}\n"
-                    f"💰 Сумма: {order_sum} р.\n"
+                    f"🛎 Заказ *{escaped_order_id}*\n"
+                    f"🍽 Время: {escaped_meal_type}\n"
+                    f"💰 Сумма: {escaped_sum} р\\.\n"
                     f"{translations.get_message('active_orders_separator')}"
                 )
                 
@@ -839,21 +846,22 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
                 # Если заказов нет или все помещается в одно сообщение
                 message = messages[0] if user_orders else message
                 if is_command:
-                    await update.message.reply_text(message)
+                    await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN_V2)
                 else:
-                    await update.callback_query.edit_message_text(message)
+                    await update.callback_query.edit_message_text(message, parse_mode=ParseMode.MARKDOWN_V2)
             else:
                 # Отправляем первое сообщение
                 if is_command:
-                    await update.message.reply_text(messages[0])
+                    await update.message.reply_text(messages[0], parse_mode=ParseMode.MARKDOWN_V2)
                 else:
-                    await update.callback_query.edit_message_text(messages[0])
+                    await update.callback_query.edit_message_text(messages[0], parse_mode=ParseMode.MARKDOWN_V2)
                 
                 # Отправляем промежуточные сообщения без кнопок
                 for msg in messages[1:]:
                     await context.bot.send_message(
                         chat_id=update.effective_chat.id,
-                        text=msg
+                        text=msg,
+                        parse_mode=ParseMode.MARKDOWN_V2
                     )
             
             # Отправляем отдельное сообщение с кнопками
