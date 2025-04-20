@@ -740,16 +740,16 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
     user_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] in ['Принят', 'Активен']]
     
     if not user_orders:
-        message = translations.get_message('no_active_orders')
+        message = escape_markdown_v2(translations.get_message('no_active_orders'))
         keyboard = [
             [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
             [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         if is_command:
-            await update.message.reply_text(message, reply_markup=reply_markup)
+            await update.message.reply_text(message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
         else:
-            await update.callback_query.edit_message_text(message, reply_markup=reply_markup)
+            await update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
     else:
         # Сортируем заказы: сначала "Принят", потом "Активен"
         user_orders.sort(key=lambda x: (x[2] != 'Принят', x[1]))
@@ -764,27 +764,44 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
         
         # Добавляем заказы в обработке
         if processing_orders:
-            messages.append("Ваши заказы, переданные повару:")
+            messages.append(escape_markdown_v2("Ваши заказы, переданные повару:"))
             for order in processing_orders:
                 # Формируем информацию о заказе
                 delivery_date = order[11] if order[11] else None
                 meal_type = order[8]
                 meal_type_with_date = f"{translations.get_meal_type(meal_type)} ({delivery_date})" if delivery_date else translations.get_meal_type(meal_type)
                 
-                order_sum = int(float(order[5])) if order[5] else 0
-                total_sum += order_sum
-                
                 # Экранируем специальные символы для Markdown V2
                 escaped_order_id = escape_markdown_v2(order[0])
+                escaped_status = escape_markdown_v2(order[2])
+                escaped_timestamp = escape_markdown_v2(order[1])
+                escaped_room = escape_markdown_v2(order[6])
+                escaped_name = escape_markdown_v2(order[7])
                 escaped_meal_type = escape_markdown_v2(meal_type_with_date)
-                escaped_sum = escape_markdown_v2(str(order_sum))
                 
                 order_info = (
-                    f"🛎 Заказ *{escaped_order_id}*\n"
-                    f"🍽 Время: {escaped_meal_type}\n"
-                    f"💰 Сумма: {escaped_sum} р\\.\n"
-                    f"{translations.get_message('active_orders_separator')}"
+                    f"🛎 Заказ *{escaped_order_id}* \\({escaped_status}\\)\n"
+                    f"⏰ {escaped_timestamp}\n"
+                    f"🏠 Комната: {escaped_room}\n"
+                    f"👤 Имя: {escaped_name}\n"
+                    f"🍽 Время дня: {escaped_meal_type}\n"
+                    f"🍲 Блюда:\n"
                 )
+                
+                # Разбиваем строку с блюдами на отдельные блюда и форматируем каждое
+                dishes = order[9].split(', ')
+                for dish in dishes:
+                    escaped_dish = escape_markdown_v2(dish)
+                    order_info += f"  • {escaped_dish}\n"
+                
+                escaped_wishes = escape_markdown_v2(order[10])
+                order_info += f"📝 Пожелания: {escaped_wishes}\n"
+                
+                order_sum = int(float(order[5])) if order[5] else 0
+                total_sum += order_sum
+                escaped_sum = escape_markdown_v2(str(order_sum))
+                order_info += f"💰 Сумма заказа: {escaped_sum} р\\.\n"
+                order_info += translations.get_message('active_orders_separator')
                 
                 # Если текущее сообщение станет слишком длинным, начинаем новое
                 if len(current_message + order_info) > 3000:  # Оставляем запас для доп. текста
@@ -799,32 +816,43 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
                 messages.append(current_message)
                 current_message = ""
             
-            messages.append("Ваши активные заказы:")
+            messages.append(escape_markdown_v2("Ваши активные заказы:"))
             for order in active_orders:
                 # Формируем информацию о заказе
                 delivery_date = order[11] if order[11] else None
                 meal_type = order[8]
                 meal_type_with_date = f"{translations.get_meal_type(meal_type)} ({delivery_date})" if delivery_date else translations.get_meal_type(meal_type)
                 
+                # Экранируем специальные символы для Markdown V2
+                escaped_order_id = escape_markdown_v2(order[0])
+                escaped_status = escape_markdown_v2(order[2])
+                escaped_timestamp = escape_markdown_v2(order[1])
+                escaped_room = escape_markdown_v2(order[6])
+                escaped_name = escape_markdown_v2(order[7])
+                escaped_meal_type = escape_markdown_v2(meal_type_with_date)
+                
                 order_info = (
-                    f"✅ Заказ {order[0]} ({order[2]})\n"
-                    f"⏰ {order[1]}\n"
-                    f"🏠 Комната: {order[6]}\n"
-                    f"👤 Имя: {order[7]}\n"
-                    f"🍽 Время дня: {meal_type_with_date}\n"
+                    f"✅ Заказ *{escaped_order_id}* \\({escaped_status}\\)\n"
+                    f"⏰ {escaped_timestamp}\n"
+                    f"🏠 Комната: {escaped_room}\n"
+                    f"👤 Имя: {escaped_name}\n"
+                    f"🍽 Время дня: {escaped_meal_type}\n"
                     f"🍲 Блюда:\n"
                 )
                 
                 # Разбиваем строку с блюдами на отдельные блюда и форматируем каждое
                 dishes = order[9].split(', ')
                 for dish in dishes:
-                    order_info += f"  • {dish}\n"
+                    escaped_dish = escape_markdown_v2(dish)
+                    order_info += f"  • {escaped_dish}\n"
                 
-                order_info += f"📝 Пожелания: {order[10]}\n"
+                escaped_wishes = escape_markdown_v2(order[10])
+                order_info += f"📝 Пожелания: {escaped_wishes}\n"
                 
                 order_sum = int(float(order[5])) if order[5] else 0
                 total_sum += order_sum
-                order_info += f"💰 Сумма заказа: {order_sum} р.\n"
+                escaped_sum = escape_markdown_v2(str(order_sum))
+                order_info += f"💰 Сумма заказа: {escaped_sum} р\\.\n"
                 order_info += translations.get_message('active_orders_separator')
                 
                 # Если текущее сообщение станет слишком длинным, начинаем новое
@@ -839,7 +867,10 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
             messages.append(current_message)
         
         # Добавляем общую сумму в последнее сообщение
-        messages[-1] += translations.get_message('total_sum', sum=total_sum)
+        escaped_total_sum = escape_markdown_v2(str(total_sum))
+        total_sum_message = translations.get_message('total_sum', sum=escaped_total_sum)
+        total_sum_message = total_sum_message.replace('.', '\\.')
+        messages[-1] += total_sum_message
         
         try:
             if not user_orders or len(messages) == 1:
@@ -877,7 +908,8 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
                 reply_markup=reply_markup
             )
         except Exception as e:
-            print(f"Ошибка при отправке списка заказов: {e}")
+            logger.error(f"Ошибка при отправке списка заказов: {e}")
+            logger.exception("Подробная информация об ошибке:")
             error_message = translations.get_message('orders_display_error')
             keyboard = [
                 [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
