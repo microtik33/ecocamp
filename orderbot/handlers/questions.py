@@ -1,5 +1,6 @@
 import telegram
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ParseMode
 from datetime import datetime
 import logging
 from .. import translations
@@ -10,6 +11,27 @@ from .states import MENU, QUESTION
 
 # Настройка логгера
 logger = logging.getLogger(__name__)
+
+def escape_markdown_v2(text):
+    """
+    Экранирует специальные символы Markdown V2 в тексте.
+    
+    Args:
+        text: Исходный текст
+        
+    Returns:
+        str: Текст с экранированными специальными символами
+    """
+    if not text:
+        return ""
+    
+    special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', 
+                    '-', '=', '|', '{', '}', '.', '!']
+    
+    for char in special_chars:
+        text = text.replace(char, f"\\{char}")
+    
+    return text
 
 @require_auth
 async def handle_question(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
@@ -43,18 +65,32 @@ async def save_question(update: telegram.Update, context: telegram.ext.ContextTy
     for row in users_data[1:]:  # Пропускаем заголовок
         if row[0] == user_id:
             phone = row[4]  # Phone Number
+            # Добавляем "+" к номеру телефона, если его еще нет
+            if phone and phone != '-' and not phone.startswith('+'):
+                phone = f"+{phone}"
             break
     
     # Форматируем сообщение для администраторов
     now = datetime.now()
     formatted_date = now.strftime("%d.%m.%Y %H:%M")
-    admin_message = f"Вопрос от @{username} ({phone})\n{formatted_date}\n{question_text}"
+    
+    # Экранируем специальные символы для MarkdownV2
+    escaped_username = escape_markdown_v2(username)
+    escaped_phone = escape_markdown_v2(phone)
+    escaped_date = escape_markdown_v2(formatted_date)
+    escaped_question = escape_markdown_v2(question_text)
+    
+    admin_message = f"*Вопрос от* @{escaped_username} \\({escaped_phone}\\)\n_{escaped_date}_\n\n{escaped_question}"
     
     # Отправляем вопрос администраторам
     admin_ids = sheets.get_admins_ids()
     for admin_id in admin_ids:
         try:
-            await context.bot.send_message(chat_id=admin_id, text=admin_message)
+            await context.bot.send_message(
+                chat_id=admin_id, 
+                text=admin_message,
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
             logging.info(f"Вопрос отправлен администратору {admin_id}")
         except Exception as e:
             logging.error(f"Ошибка при отправке вопроса администратору {admin_id}: {e}")

@@ -13,9 +13,10 @@ from orderbot.handlers.order import (
     MENU, ROOM, NAME, MEAL_TYPE, DISH_SELECTION, WISHES, QUESTION, EDIT_ORDER,
     get_delivery_date, show_order_form, handle_order_time_error, ask_room,
     ask_name, ask_meal_type, show_dishes, handle_dish_selection,
-    handle_text_input, show_user_orders, handle_question, save_question,
+    handle_text_input, show_user_orders, 
     show_edit_active_orders, start_new_order, process_order_save
 )
+from orderbot.handlers import handle_question, save_question
 
 if TYPE_CHECKING:
     from _pytest.fixtures import FixtureRequest
@@ -377,12 +378,20 @@ async def test_handle_question(mock_update: Update, mock_context: MagicMock) -> 
 async def test_save_question(mock_update: Update, mock_context: MagicMock) -> None:
     """Тест сохранения вопроса."""
     mock_update.message.text = "Какой у вас график работы?"
-    result = await save_question(mock_update, mock_context)
-    mock_update.message.reply_text.assert_called_once()
-    args = mock_update.message.reply_text.call_args
-    assert args is not None
-    assert "Спасибо за ваш вопрос" in args[0][0]
-    assert result == MENU
+    
+    # Настраиваем моки
+    with patch('orderbot.services.sheets.save_question', return_value=True), \
+         patch('orderbot.services.sheets.get_users_sheet'), \
+         patch('orderbot.services.sheets.get_admins_ids', return_value=[]), \
+         patch('orderbot.translations.get_message', return_value='Спасибо за ваш вопрос'), \
+         patch('orderbot.translations.get_button', side_effect=lambda x: x):
+        
+        result = await save_question(mock_update, mock_context)
+        mock_update.message.reply_text.assert_called_once()
+        args = mock_update.message.reply_text.call_args
+        assert args is not None
+        assert "Спасибо за ваш вопрос" in args[0][0]
+        assert result == MENU
 
 @pytest.mark.asyncio
 async def test_show_edit_active_orders(mock_update: Update, mock_context: MagicMock) -> None:
