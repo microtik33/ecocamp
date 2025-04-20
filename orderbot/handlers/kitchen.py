@@ -206,7 +206,7 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
                 
                 # Отправляем первую часть сообщения
                 first_message = message
-                await update.message.reply_text(first_message)
+                await update.message.reply_text(first_message, parse_mode=ParseMode.MARKDOWN)
                 
                 # Отправляем списки блюд частями
                 current_dishes = "🍲 Блюда:\n"
@@ -217,13 +217,13 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
                     dish_line = f"- {dish}\n"
                     
                     if len(current_dishes) + len(dish_line) > MAX_MESSAGE_LENGTH:
-                        await update.message.reply_text(current_dishes)
+                        await update.message.reply_text(current_dishes, parse_mode=ParseMode.MARKDOWN)
                         current_dishes = "🍲 Блюда (продолжение):\n" + dish_line
                     else:
                         current_dishes += dish_line
                 
                 if current_dishes and current_dishes != "🍲 Блюда:\n" and current_dishes != "🍲 Блюда (продолжение):\n":
-                    await update.message.reply_text(current_dishes)
+                    await update.message.reply_text(current_dishes, parse_mode=ParseMode.MARKDOWN)
                 
                 # Отправляем дополнительную информацию
                 keyboard = [[
@@ -231,7 +231,7 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
                     InlineKeyboardButton("По номеру", callback_data="search_by_number")
                 ]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                await update.message.reply_text(additional_info, reply_markup=reply_markup)
+                await update.message.reply_text(additional_info, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
             else:
                 # Если сообщение нормальной длины, отправляем всё вместе
                 complete_message = message + dishes_list[0] + additional_info
@@ -243,7 +243,7 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
                 ]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
-                await update.message.reply_text(complete_message, reply_markup=reply_markup)
+                await update.message.reply_text(complete_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
         else:
             # Если заказ не найден
             keyboard = [[
@@ -251,7 +251,7 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
                 InlineKeyboardButton("По номеру", callback_data="search_by_number")
             ]]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text(f"Заказ с номером {order_number} не найден.", reply_markup=reply_markup)
+            await update.message.reply_text(f"Заказ с номером {order_number} не найден.", reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
     
     except Exception as e:
         keyboard = [[
@@ -259,7 +259,7 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
             InlineKeyboardButton("По номеру", callback_data="search_by_number")
         ]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(f"Ошибка при поиске заказа: {e}", reply_markup=reply_markup)
+        await update.message.reply_text(f"Ошибка при поиске заказа: {e}", reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
         # Логирование ошибки для отладки
         print(f"Ошибка при поиске заказа номер {order_number}: {e}")
 
@@ -351,7 +351,7 @@ async def find_orders_by_room(update: Update, context: ContextTypes.DEFAULT_TYPE
                 ]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
-                await query.edit_message_text(messages[0], reply_markup=reply_markup)
+                await query.edit_message_text(messages[0], reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
                 
                 # Отправляем остальные сообщения, если они есть
                 for i in range(1, len(messages)):
@@ -360,13 +360,15 @@ async def find_orders_by_room(update: Update, context: ContextTypes.DEFAULT_TYPE
                         await context.bot.send_message(
                             chat_id=query.message.chat_id,
                             text=messages[i],
-                            reply_markup=reply_markup
+                            reply_markup=reply_markup,
+                            parse_mode=ParseMode.MARKDOWN
                         )
                     else:
                         # Промежуточные сообщения без кнопок
                         await context.bot.send_message(
                             chat_id=query.message.chat_id,
-                            text=messages[i]
+                            text=messages[i],
+                            parse_mode=ParseMode.MARKDOWN
                         )
         else:
             # Если заказы не найдены
@@ -375,7 +377,7 @@ async def find_orders_by_room(update: Update, context: ContextTypes.DEFAULT_TYPE
                 InlineKeyboardButton("По номеру", callback_data="search_by_number")
             ]]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(f"Заказы для комнаты {room_number} на сегодня не найдены.", reply_markup=reply_markup)
+            await query.edit_message_text(f"Заказы для комнаты {room_number} на сегодня не найдены.", reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
     
     except Exception as e:
         keyboard = [[
@@ -383,7 +385,7 @@ async def find_orders_by_room(update: Update, context: ContextTypes.DEFAULT_TYPE
             InlineKeyboardButton("По номеру", callback_data="search_by_number")
         ]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(f"Ошибка при поиске заказов: {e}", reply_markup=reply_markup)
+        await query.edit_message_text(f"Ошибка при поиске заказов: {e}", reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
         # Логирование ошибки для отладки
         print(f"Ошибка при поиске заказов по комнате {room_number}: {e}")
 
@@ -407,4 +409,4 @@ async def back_to_kitchen(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(search_message, reply_markup=reply_markup) 
+    await query.edit_message_text(search_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN) 
