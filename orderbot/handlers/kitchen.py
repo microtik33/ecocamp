@@ -166,11 +166,11 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
             status_emoji = "🔴" if is_cancelled else ""
             
             # Формируем сообщение с информацией о заказе в новом формате с эмодзи
-            message = f"🔢 Заказ №{order_found[0]}\n\n"
-            message += f"⏰ Статус: {status_emoji} {order_found[2]}\n\n"
-            message += f"🏠 Комната: {order_found[6]}\n"
-            message += f"👤 Имя: {order_found[7]}\n"
-            message += f"🍽 Время дня: {translations.get_meal_type(order_found[8])}\n"
+            message = f"🔢 Заказ №*{order_found[0]}*\n\n"
+            message += f"⏰ Статус: *{status_emoji} {order_found[2]}*\n\n"
+            message += f"🏠 Комната: *{order_found[6]}*\n"
+            message += f"👤 Имя: *{order_found[7]}*\n"
+            message += f"🍽 Время: *{translations.get_meal_type(order_found[8])}*\n"
             
             # Подготавливаем блюда для отображения
             dishes_list = []
@@ -185,9 +185,9 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
                 dishes_list.append("🍲 Блюда: -\n")
             
             # Добавляем пожелания и дату выдачи
-            additional_info = f"📝 Пожелания: {order_found[10] if order_found[10] and order_found[10] != '—' else '-'}\n"
-            additional_info += f"📅 Дата выдачи: {order_found[11]}\n\n"
-            additional_info += f"📨 Время заказа: {order_found[1]}"
+            additional_info = f"📝 Пожелания: *{order_found[10] if order_found[10] and order_found[10] != '—' else '-'}*\n"
+            additional_info += f"📅 Дата выдачи: *{order_found[11]}*\n\n"
+            additional_info += f"_📨 Время заказа: {order_found[1]}_"
             
             # Добавляем информацию, относится ли заказ к текущей сводке
             if not is_today_order:
@@ -226,7 +226,10 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
                     await update.message.reply_text(current_dishes)
                 
                 # Отправляем дополнительную информацию
-                keyboard = [[InlineKeyboardButton("Назад к поиску", callback_data="back_to_kitchen")]]
+                keyboard = [[
+                    InlineKeyboardButton("По комнате", callback_data="search_by_room"),
+                    InlineKeyboardButton("По номеру", callback_data="search_by_number")
+                ]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 await update.message.reply_text(additional_info, reply_markup=reply_markup)
             else:
@@ -234,18 +237,27 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
                 complete_message = message + dishes_list[0] + additional_info
                 
                 # Добавляем кнопку "Назад к поиску"
-                keyboard = [[InlineKeyboardButton("Назад к поиску", callback_data="back_to_kitchen")]]
+                keyboard = [[
+                    InlineKeyboardButton("По комнате", callback_data="search_by_room"),
+                    InlineKeyboardButton("По номеру", callback_data="search_by_number")
+                ]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await update.message.reply_text(complete_message, reply_markup=reply_markup)
         else:
             # Если заказ не найден
-            keyboard = [[InlineKeyboardButton("Назад к поиску", callback_data="back_to_kitchen")]]
+            keyboard = [[
+                InlineKeyboardButton("По комнате", callback_data="search_by_room"),
+                InlineKeyboardButton("По номеру", callback_data="search_by_number")
+            ]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(f"Заказ с номером {order_number} не найден.", reply_markup=reply_markup)
     
     except Exception as e:
-        keyboard = [[InlineKeyboardButton("Назад к поиску", callback_data="back_to_kitchen")]]
+        keyboard = [[
+            InlineKeyboardButton("По комнате", callback_data="search_by_room"),
+            InlineKeyboardButton("По номеру", callback_data="search_by_number")
+        ]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(f"Ошибка при поиске заказа: {e}", reply_markup=reply_markup)
         # Логирование ошибки для отладки
@@ -299,9 +311,9 @@ async def find_orders_by_room(update: Update, context: ContextTypes.DEFAULT_TYPE
             # Формируем сообщения с заказами в новом формате
             for order in room_orders:
                 # Изменяем порядок отображения информации о заказе
-                order_text = f"🔢 Заказ №{order[0]}\n"
-                order_text += f"👤 Имя: {order[7]}\n"
-                order_text += f"🍽 Время дня: {translations.get_meal_type(order[8])}\n"
+                order_text = f"🔢 Заказ №*{order[0]}*\n"
+                order_text += f"👤 Имя: *{order[7]}*\n"
+                order_text += f"🍽 Время: *{translations.get_meal_type(order[8])}*\n"
                 
                 # Добавляем блюда с разбивкой на отдельные строки
                 if order[9]:
@@ -314,7 +326,7 @@ async def find_orders_by_room(update: Update, context: ContextTypes.DEFAULT_TYPE
                     order_text += "🍲 Блюда: -\n"
                 
                 # Добавляем пожелания
-                order_text += f"📝 Пожелания: {order[10] if order[10] and order[10] != '—' else '-'}\n"
+                order_text += f"📝 Пожелания: *{order[10] if order[10] and order[10] != '—' else '-'}*\n"
                 order_text += "─" * 30 + "\n"
                 
                 # Проверяем, поместится ли заказ в текущее сообщение
@@ -333,7 +345,10 @@ async def find_orders_by_room(update: Update, context: ContextTypes.DEFAULT_TYPE
             # Отправляем сообщения
             if messages:
                 # Отправляем первое сообщение, заменяя текущее
-                keyboard = [[InlineKeyboardButton("Назад к списку комнат", callback_data="search_by_room")]]
+                keyboard = [[
+                    InlineKeyboardButton("По комнате", callback_data="search_by_room"),
+                    InlineKeyboardButton("По номеру", callback_data="search_by_number")
+                ]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await query.edit_message_text(messages[0], reply_markup=reply_markup)
@@ -355,12 +370,18 @@ async def find_orders_by_room(update: Update, context: ContextTypes.DEFAULT_TYPE
                         )
         else:
             # Если заказы не найдены
-            keyboard = [[InlineKeyboardButton("Назад к списку комнат", callback_data="search_by_room")]]
+            keyboard = [[
+                InlineKeyboardButton("По комнате", callback_data="search_by_room"),
+                InlineKeyboardButton("По номеру", callback_data="search_by_number")
+            ]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(f"Заказы для комнаты {room_number} на сегодня не найдены.", reply_markup=reply_markup)
     
     except Exception as e:
-        keyboard = [[InlineKeyboardButton("Назад к поиску", callback_data="back_to_kitchen")]]
+        keyboard = [[
+            InlineKeyboardButton("По комнате", callback_data="search_by_room"),
+            InlineKeyboardButton("По номеру", callback_data="search_by_number")
+        ]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(f"Ошибка при поиске заказов: {e}", reply_markup=reply_markup)
         # Логирование ошибки для отладки

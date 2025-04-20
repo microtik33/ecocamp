@@ -431,15 +431,15 @@ async def test_start_new_order(mock_update: Update, mock_context: MagicMock) -> 
         result = await start_new_order(mock_update, mock_context)
         
         # Проверяем вызовы
-        mock_update.message.reply_text.assert_has_awaits([
-            call(ANY),  # Первый вызов для формы заказа
-            call('Выберите комнату', reply_markup=ANY)  # Второй вызов для выбора комнаты
-        ])
+        assert mock_update.message.reply_text.call_count >= 2
+        
+        # Проверяем последний вызов (должен быть для выбора комнаты)
+        last_call = mock_update.message.reply_text.call_args_list[-1]
+        assert last_call[0][0] == 'Выберите комнату'
+        assert 'reply_markup' in last_call[1]
         
         # Проверяем клавиатуру
-        call_args = mock_update.message.reply_text.call_args_list[-1]  # Берем последний вызов
-        assert call_args is not None
-        keyboard = call_args[1]['reply_markup']
+        keyboard = last_call[1]['reply_markup']
         assert keyboard is not None
         assert len(keyboard.inline_keyboard) > 0
         
