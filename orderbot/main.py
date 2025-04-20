@@ -117,9 +117,6 @@ async def main() -> None:
         application.add_handler(CommandHandler('memory', memory_stats))
         application.add_handler(CommandHandler('funcstats', function_stats))
         
-        # Добавляем обработчик команды /ask
-        application.add_handler(CommandHandler('ask', ask_command))
-        
         # Устанавливаем базовые команды для всех пользователей
         await setup_commands_for_user(application.bot)
         
