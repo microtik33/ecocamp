@@ -1,5 +1,6 @@
 import telegram
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
+from telegram.constants import ParseMode
 from datetime import datetime, timedelta, date
 import logging
 from .. import translations
@@ -15,7 +16,6 @@ from .states import PHONE, MENU, ROOM, NAME, MEAL_TYPE, DISH_SELECTION, WISHES, 
 from typing import List, Tuple, Dict, Optional, Any, Union
 from ..utils.profiler import profile_time
 from ..utils.markdown_utils import escape_markdown_v2
-from telegram import ParseMode
 
 # Настройка логгера
 logger = logging.getLogger(__name__)
