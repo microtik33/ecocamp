@@ -80,7 +80,7 @@ async def save_question(update: telegram.Update, context: telegram.ext.ContextTy
     escaped_date = escape_markdown_v2(formatted_date)
     escaped_question = escape_markdown_v2(question_text)
     
-    admin_message = f"*Вопрос от* @{escaped_username} \\({escaped_phone}\\)\n_{escaped_date}_\n\n{escaped_question}"
+    admin_message = f"❓ *Вопрос от* @{escaped_username} \\({escaped_phone}\\)\n_{escaped_date}_\n\n{escaped_question}"
     
     # Отправляем вопрос администраторам
     admin_ids = sheets.get_admins_ids()
