@@ -1,8 +1,9 @@
 import telegram
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputFile
 from telegram.constants import ParseMode
 from datetime import datetime
 import logging
+import os
 from .. import translations
 from ..services import sheets
 from ..utils.time_utils import is_order_time
@@ -82,18 +83,43 @@ async def save_question(update: telegram.Update, context: telegram.ext.ContextTy
     
     admin_message = f"❓ *Вопрос от* @{escaped_username} \\({escaped_phone}\\)\n_{escaped_date}_\n\n{escaped_question}"
     
+    # Путь к изображению (в текущей директории handlers)
+    image_path = os.path.join(os.path.dirname(__file__), 'question.png')
+    
     # Отправляем вопрос администраторам
     admin_ids = sheets.get_admins_ids()
     for admin_id in admin_ids:
         try:
-            await context.bot.send_message(
-                chat_id=admin_id, 
-                text=admin_message,
-                parse_mode=ParseMode.MARKDOWN_V2
-            )
+            # Проверяем существование файла изображения
+            if os.path.exists(image_path):
+                # Отправляем изображение с подписью
+                with open(image_path, 'rb') as photo:
+                    await context.bot.send_photo(
+                        chat_id=admin_id,
+                        photo=photo,
+                        caption=admin_message,
+                        parse_mode=ParseMode.MARKDOWN_V2
+                    )
+            else:
+                # Если изображение не найдено, отправляем только текст
+                await context.bot.send_message(
+                    chat_id=admin_id, 
+                    text=admin_message,
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
             logging.info(f"Вопрос отправлен администратору {admin_id}")
         except Exception as e:
             logging.error(f"Ошибка при отправке вопроса администратору {admin_id}: {e}")
+            # Пробуем отправить хотя бы текст, если возникла ошибка с изображением
+            try:
+                await context.bot.send_message(
+                    chat_id=admin_id, 
+                    text=admin_message,
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
+                logging.info(f"Отправлен только текст вопроса администратору {admin_id}")
+            except Exception as e2:
+                logging.error(f"Не удалось отправить даже текст администратору {admin_id}: {e2}")
     
     # Возвращаем пользователя в главное меню
     # Проверяем время для заказа
