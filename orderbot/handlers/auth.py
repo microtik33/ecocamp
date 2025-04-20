@@ -11,6 +11,7 @@ async def setup_commands_for_user(bot, user_id=None, is_cook=False):
         BotCommand("menu", "меню на завтра"),
         BotCommand("today", "меню на сегодня"),
         BotCommand("myorders", "мои заказы"),
+        BotCommand("ask", "задать вопрос"),
         BotCommand("start", "перезапустить бота")
     ]
     

@@ -35,6 +35,20 @@ def escape_markdown_v2(text):
     return text
 
 @require_auth
+async def ask_command(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
+    """Обработка команды /ask."""
+    keyboard = [
+        [InlineKeyboardButton(translations.get_button('back'), callback_data="back_to_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        text=translations.get_message('ask_question'),
+        reply_markup=reply_markup
+    )
+    return QUESTION
+
+@require_auth
 async def handle_question(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Обработка вопросов."""
     query = update.callback_query
