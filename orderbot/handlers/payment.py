@@ -15,7 +15,7 @@ from telegram.ext import ContextTypes
 
 from orderbot import translations
 from orderbot.handlers.states import MENU
-from orderbot.handlers.auth import require_auth
+from orderbot.utils.auth_decorator import require_auth
 from orderbot.utils.helpers import escape_markdown_v2, profile_time
 from orderbot.services.payment import tochka_client
 
