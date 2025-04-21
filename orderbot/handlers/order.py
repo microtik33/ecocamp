@@ -855,7 +855,11 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
         # Добавляем общую сумму в последнее сообщение
         escaped_total_sum = escape_markdown_v2(str(total_sum))
         total_sum_message = translations.get_message('total_sum', sum=escaped_total_sum)
-        total_sum_message = total_sum_message.replace('.', '\\.')
+        
+        # Логирование для отладки
+        logger.info(f"Итоговая сумма: {total_sum}, экранированная: {escaped_total_sum}")
+        logger.info(f"Сообщение о сумме: {total_sum_message}")
+        
         messages[-1] += total_sum_message
         
         try:
