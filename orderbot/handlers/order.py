@@ -12,7 +12,7 @@ from ..services.sheets import (
 from ..services.user import update_user_info, update_user_stats
 from ..utils.time_utils import is_order_time
 from ..utils.auth_decorator import require_auth
-from .states import PHONE, MENU, ROOM, NAME, MEAL_TYPE, DISH_SELECTION, WISHES, QUESTION, EDIT_ORDER
+from .states import PHONE, MENU, ROOM, NAME, MEAL_TYPE, DISH_SELECTION, WISHES, QUESTION, EDIT_ORDER, PAYMENT
 from typing import List, Tuple, Dict, Optional, Any, Union
 from ..utils.profiler import profile_time
 from ..utils.markdown_utils import escape_markdown_v2

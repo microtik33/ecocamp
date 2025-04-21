@@ -13,7 +13,7 @@ from telegram import Update
 from .handlers.menu import start, show_tomorrow_menu, show_dish_compositions, back_to_main_menu, show_today_menu, update_caches
 from .handlers.order import (
     PHONE, MENU, ROOM, NAME, MEAL_TYPE, 
-    DISH_SELECTION, WISHES, QUESTION, PAYMENT,
+    DISH_SELECTION, WISHES, QUESTION,
     ask_room,
     show_user_orders,
     cancel_order,
@@ -27,6 +27,7 @@ from .handlers.order import (
     show_edit_active_orders,
     start_new_order
 )
+from .handlers.states import PAYMENT
 from .handlers import handle_question, save_question, ask_command
 from .handlers.auth import start as auth_start, handle_phone, setup_commands_for_user
 from .handlers.kitchen import kitchen_summary, search_orders_by_room, search_orders_by_number, find_orders_by_room, back_to_kitchen, handle_order_number_input
