@@ -144,8 +144,16 @@ async def pay_with_sbp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             "qrc_url": qrc_url,
             "amount": total_sum,
             "order_ids": order_ids,
-            "status": "PENDING"
+            "status": "PENDING",
+            "order_row_indices": []  # Добавляем индексы строк заказов для обновления
         }
+        
+        # Сохраняем индексы заказов в таблице для последующего обновления статусов
+        for i, row in enumerate(all_orders[1:], start=2):
+            if row[3] == user_id and row[2] in ['Принят', 'Активен'] and row[0] in order_ids:
+                PAYMENT_CACHE[user_id]["order_row_indices"].append(i)
+        
+        logger.info(f"Создан QR-код для оплаты: {qrc_id}, URL: {qrc_url}")
         
         # Генерируем QR-код как изображение
         qr_image = await generate_qr_code_image(qrc_url)
@@ -249,9 +257,11 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
         payment_info["status"] = status
         PAYMENT_CACHE[user_id] = payment_info
         
+        logger.info(f"Проверка статуса платежа {qrc_id}: {payment_status}")
+        
         # Обрабатываем разные статусы платежа
-        if status == "Confirming" or status == "ACWP":
-            # Платеж успешно выполнен
+        if status == "Active" or status == "ACWP" or status == "Confirming":
+            # Платеж успешно выполнен или активен
             message = translations.get_message('sbp_payment_success', amount=str(payment_info.get("amount", 0)))
             keyboard = [
                 [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],

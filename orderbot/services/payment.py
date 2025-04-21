@@ -107,24 +107,43 @@ class TochkaSBPClient:
         # Формируем уникальный идентификатор QR-кода
         qrc_id = f"ECOCAMP_{uuid.uuid4().hex[:16]}"
         
-        # Формируем данные для запроса
-        data = {
-            "qrcType": "02",  # Динамический QR-код
-            "amount": str(amount),
-            "currency": "RUB",
-            "paymentPurpose": description,
-            "qrcId": qrc_id,
-            "additionalInfo": order_id,
-            "sourceName": "ECOCAMP_BOT"
+        # Формируем запрос согласно документации API Точка банка
+        # Для создания QR-кода используем метод Register Qr Code
+        request_data = {
+            "Data": {
+                "qrcType": "02",  # 02 - Динамический QR-код
+                "amount": int(amount * 100),  # Сумма в копейках
+                "currency": "RUB",
+                "paymentPurpose": description,
+                "sourceName": "ECOCAMP_BOT",
+                "qrcId": qrc_id,
+                "additionalInfo": order_id
+            }
         }
         
-        endpoint = f"sbp/{SBP_API_VERSION}/qrc/register"
-        params = f"?customerCode={self.customer_code}"
+        # В соответствии с документацией API, структура URL:
+        # /sbp/{apiVersion}/qr-code/merchant/{merchantId}/{accountId}
+        # Мы используем customerCode вместо merchantId и accountId
+        endpoint = f"sbp/{SBP_API_VERSION}/qr-code/merchant/{self.customer_code}/{self.customer_code}"
         
         try:
-            result = await self._make_request("POST", f"{endpoint}{params}", data)
-            logger.info(f"Создан QR-код для оплаты: {qrc_id}")
-            return result.get("Data", {})
+            logger.info(f"Отправляем запрос на создание QR-кода: {endpoint}, данные: {request_data}")
+            result = await self._make_request("POST", endpoint, request_data)
+            
+            if result and "Data" in result:
+                qr_data = result["Data"]
+                logger.info(f"Создан QR-код для оплаты: {qr_data}")
+                
+                # Преобразуем ответ в формат, ожидаемый нашим приложением
+                return {
+                    "qrcId": qrc_id,
+                    "payload": qr_data.get("payload", ""),
+                    "amount": amount,
+                    "description": description
+                }
+            
+            raise Exception(f"Неожиданный ответ от API Точка: {result}")
+        
         except Exception as e:
             logger.error(f"Ошибка при создании QR-кода: {e}")
             raise Exception(f"Не удалось создать QR-код для оплаты: {e}")
@@ -145,15 +164,27 @@ class TochkaSBPClient:
         if not self.api_token or not self.customer_code:
             raise Exception("API Точка банка не настроено. Проверка статуса платежа недоступна.")
         
-        endpoint = f"sbp/{SBP_API_VERSION}/get-sbp-payments"
-        params = f"?customerCode={self.customer_code}&qrcId={qrc_id}"
+        # Согласно документации, запрос статуса QR-кода:
+        # GET /sbp/{apiVersion}/qr-code/legal-entity/{legalId}
+        endpoint = f"sbp/{SBP_API_VERSION}/qr-code/legal-entity/{self.customer_code}"
         
         try:
-            result = await self._make_request("GET", f"{endpoint}{params}")
-            payments = result.get("Data", {}).get("Payments", [])
+            result = await self._make_request("GET", endpoint)
             
-            if payments:
-                return payments[0]
+            if not result or "Data" not in result or "qrCodeList" not in result["Data"]:
+                return {"status": "NotFound", "message": "Платеж не найден"}
+            
+            # Ищем QR-код по ID
+            qr_codes = result["Data"]["qrCodeList"]
+            for qr_code in qr_codes:
+                if qr_code.get("qrcId") == qrc_id:
+                    return {
+                        "status": qr_code.get("status", "Unknown"),
+                        "message": "QR-код найден",
+                        "qrcId": qrc_id,
+                        "amount": qr_code.get("amount", 0)
+                    }
+            
             return {"status": "NotFound", "message": "Платеж не найден"}
         
         except Exception as e:
@@ -179,17 +210,17 @@ class TochkaSBPClient:
         if not self.api_token or not self.customer_code:
             raise Exception("API Точка банка не настроено. Получение списка платежей недоступно.")
         
-        endpoint = f"sbp/{SBP_API_VERSION}/get-sbp-payments"
-        params = f"?customerCode={self.customer_code}"
-        
-        if from_date:
-            params += f"&fromDate={from_date}"
-        if to_date:
-            params += f"&toDate={to_date}"
+        # Согласно документации, получение списка QR-кодов:
+        # GET /sbp/{apiVersion}/qr-code/legal-entity/{legalId}
+        endpoint = f"sbp/{SBP_API_VERSION}/qr-code/legal-entity/{self.customer_code}"
         
         try:
-            result = await self._make_request("GET", f"{endpoint}{params}")
-            return result.get("Data", {}).get("Payments", [])
+            result = await self._make_request("GET", endpoint)
+            
+            if not result or "Data" not in result or "qrCodeList" not in result["Data"]:
+                return []
+            
+            return result["Data"]["qrCodeList"]
         
         except Exception as e:
             logger.error(f"Ошибка при получении списка платежей: {e}")
