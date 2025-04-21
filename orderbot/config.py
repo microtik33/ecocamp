@@ -48,3 +48,8 @@ GOOGLE_SHEETS_SCOPE = [
 # Уникальные идентификаторы Google таблиц (не зависят от имени таблицы)
 MENU_SHEET_ID = os.getenv('MENU_SHEET_ID')
 ORDERS_SHEET_ID = os.getenv('ORDERS_SHEET_ID')
+
+# Настройки API Точка банка для СБП
+TOCHKA_BASE_URL = os.getenv('TOCHKA_BASE_URL')
+TOCHKA_API_TOKEN = os.getenv('TOCHKA_API_TOKEN')
+TOCHKA_CUSTOMER_CODE = os.getenv('TOCHKA_CUSTOMER_CODE')

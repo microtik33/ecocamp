@@ -70,7 +70,9 @@ coverage.xml
 
 # Environment variables
 .env
+.env.example
 credentials.json
 
 specs.md
 performance.md
+docs/

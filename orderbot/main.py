@@ -32,6 +32,7 @@ from .handlers.auth import start as auth_start, handle_phone, setup_commands_for
 from .handlers.kitchen import kitchen_summary, search_orders_by_room, search_orders_by_number, find_orders_by_room, back_to_kitchen, handle_order_number_input
 from .handlers.stats import performance_stats, clear_performance_stats, memory_stats, function_stats
 from .tasks import start_status_update_task, stop_status_update_task, schedule_daily_tasks
+from .handlers.payment import pay_with_sbp, check_payment_status, open_qr_code, cancel_payment
 import os
 import asyncio
 import sys
@@ -41,7 +42,7 @@ from aiohttp import web, ClientSession
 from datetime import datetime
 import pytz
 from .services.records import process_daily_orders
-from .services.sheets import auth_sheet, is_user_cook, force_update_menu_cache, force_update_composition_cache, force_update_today_menu_cache
+from .services.sheets import auth_sheet, is_user_cook, force_update_menu_cache, force_update_composition_cache, force_update_today_menu_cache, update_orders_status
 
 # Включаем tracemalloc для диагностики
 tracemalloc.start()
@@ -201,6 +202,13 @@ async def main() -> None:
         application.add_handler(CallbackQueryHandler(show_tomorrow_menu, pattern='tomorrow_menu'))
         application.add_handler(CallbackQueryHandler(show_dish_compositions, pattern='show_compositions'))
         application.add_handler(CallbackQueryHandler(back_to_main_menu, pattern='back_to_menu'))
+        
+        # Добавляем обработчики для оплаты через СБП
+        application.add_handler(CallbackQueryHandler(pay_with_sbp, pattern='pay_sbp'))
+        application.add_handler(CallbackQueryHandler(check_payment_status, pattern='check_payment'))
+        application.add_handler(CallbackQueryHandler(open_qr_code, pattern='open_qr_code'))
+        application.add_handler(CallbackQueryHandler(cancel_payment, pattern='cancel_payment'))
+        application.add_handler(CommandHandler('pay', pay_with_sbp))
         
         # Запуск планировщика задач
         asyncio.create_task(schedule_daily_tasks())
