@@ -883,9 +883,9 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
             
             # Отправляем отдельное сообщение с кнопками
             keyboard = [
+                [InlineKeyboardButton(translations.get_button('pay_orders'), callback_data='pay_orders')],
                 [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
                 [InlineKeyboardButton(translations.get_button('edit_active_orders'), callback_data='edit_active_orders')],
-                [InlineKeyboardButton(translations.get_button('pay_sbp'), callback_data='pay_sbp')],
                 [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -901,7 +901,6 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
             keyboard = [
                 [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
                 [InlineKeyboardButton(translations.get_button('edit_active_orders'), callback_data='edit_active_orders')],
-                [InlineKeyboardButton(translations.get_button('pay_sbp'), callback_data='pay_sbp')],
                 [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)

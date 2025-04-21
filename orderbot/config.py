@@ -21,16 +21,18 @@ for logger_name in ['httpx', 'telegram', 'aiohttp']:
     logging.getLogger(logger_name).setLevel(logging.INFO)
     logging.getLogger(logger_name).propagate = True
 
-from dotenv import load_dotenv
-
-# Загружаем переменные окружения
-load_dotenv()
+# Загружаем переменные окружения из .env, если файл существует
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    logging.info("python-dotenv не установлен, используем переменные окружения напрямую")
 
 # Токен Telegram бота
-BOT_TOKEN = os.getenv('BOT_TOKEN')
+BOT_TOKEN = os.environ.get('BOT_TOKEN')
 
 # Настройки Google Sheets
-GOOGLE_CREDENTIALS_BASE64 = os.getenv('GOOGLE_CREDENTIALS_BASE64')
+GOOGLE_CREDENTIALS_BASE64 = os.environ.get('GOOGLE_CREDENTIALS_BASE64')
 if GOOGLE_CREDENTIALS_BASE64:
     # Декодируем credentials из base64 и сохраняем во временный файл
     credentials_json = base64.b64decode(GOOGLE_CREDENTIALS_BASE64)
@@ -46,10 +48,19 @@ GOOGLE_SHEETS_SCOPE = [
     "https://www.googleapis.com/auth/drive"
 ]
 # Уникальные идентификаторы Google таблиц (не зависят от имени таблицы)
-MENU_SHEET_ID = os.getenv('MENU_SHEET_ID')
-ORDERS_SHEET_ID = os.getenv('ORDERS_SHEET_ID')
+MENU_SHEET_ID = os.environ.get('MENU_SHEET_ID')
+ORDERS_SHEET_ID = os.environ.get('ORDERS_SHEET_ID')
 
-# Настройки API Точка банка для СБП
-TOCHKA_BASE_URL = os.getenv('TOCHKA_BASE_URL')
-TOCHKA_API_TOKEN = os.getenv('TOCHKA_API_TOKEN')
-TOCHKA_CUSTOMER_CODE = os.getenv('TOCHKA_CUSTOMER_CODE')
+# Настройки для API Точка Банка
+TOCHKA_JWT_TOKEN = os.environ.get('TOCHKA_JWT_TOKEN')
+TOCHKA_CLIENT_ID = os.environ.get('TOCHKA_CLIENT_ID')
+TOCHKA_ACCOUNT_ID = os.environ.get('TOCHKA_ACCOUNT_ID')
+TOCHKA_MERCHANT_ID = os.environ.get('TOCHKA_MERCHANT_ID')
+
+# Логгируем только при отсутствии важных переменных окружения
+if not TOCHKA_JWT_TOKEN:
+    logging.warning("TOCHKA_JWT_TOKEN не найден в переменных окружения")
+if not TOCHKA_ACCOUNT_ID:
+    logging.warning("TOCHKA_ACCOUNT_ID не найден в переменных окружения")
+if not TOCHKA_MERCHANT_ID:
+    logging.warning("TOCHKA_MERCHANT_ID не найден в переменных окружения")
