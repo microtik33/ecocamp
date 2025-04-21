@@ -6,8 +6,9 @@ from datetime import datetime
 
 from ..config import TOCHKA_JWT_TOKEN, TOCHKA_CLIENT_ID
 
-# Базовый URL для API Точки
-BASE_URL = 'https://enter.tochka.com/api/v2'
+# Базовый URL для API Точки (исправлен в соответствии с документацией)
+BASE_URL = 'https://enter.tochka.com/uapi'
+API_VERSION = 'v1.0'
 
 # Настройка логгера
 logger = logging.getLogger(__name__)
@@ -19,6 +20,10 @@ def _get_headers() -> Dict[str, str]:
     Returns:
         Dict[str, str]: Заголовки для запроса
     """
+    if not TOCHKA_JWT_TOKEN:
+        logger.error("JWT токен не найден в переменных окружения!")
+        return {}
+        
     return {
         'Authorization': f'Bearer {TOCHKA_JWT_TOKEN}',
         'Content-Type': 'application/json'
@@ -32,8 +37,16 @@ def get_customer_info() -> Dict[str, Any]:
         Dict[str, Any]: Информация о клиенте
     """
     try:
-        url = f"{BASE_URL}/sbp/customer/info"
-        response = requests.get(url, headers=_get_headers())
+        url = f"{BASE_URL}/sbp/{API_VERSION}/customer/info"
+        headers = _get_headers()
+        
+        if not headers:
+            return {"error": "JWT токен не настроен"}
+            
+        logger.info(f"Отправка запроса на {url}")
+        response = requests.get(url, headers=headers)
+        logger.info(f"Получен ответ: статус {response.status_code}")
+        
         response.raise_for_status()
         return response.json()
     except Exception as e:
@@ -55,24 +68,54 @@ def register_qr_code(account_id: str, merchant_id: str, amount: int,
         Dict[str, Any]: Данные созданного QR-кода
     """
     try:
-        url = f"{BASE_URL}/sbp/qr-code/register"
+        # Проверка наличия обязательных параметров
+        if not account_id or not merchant_id:
+            logger.error(f"Не указаны обязательные параметры: account_id={account_id}, merchant_id={merchant_id}")
+            return {"error": "Не указаны обязательные параметры"}
+            
+        # Формирование URL запроса в соответствии с документацией
+        url = f"{BASE_URL}/sbp/{API_VERSION}/qr-code/merchant/{merchant_id}/{account_id}"
+        
+        # Заголовки запроса
+        headers = _get_headers()
+        if not headers:
+            return {"error": "JWT токен не настроен"}
+        
+        # Формирование тела запроса в соответствии с документацией
         data = {
-            "accountId": account_id,
-            "merchantId": merchant_id,
-            "paymentPurpose": payment_purpose,
-            "amount": amount,
-            "qrcType": "02",  # Динамический QR-код
-            "ttl": 30,  # Время жизни QR-кода - 30 минут
-            "sourceName": "EcoCamp Bot",
-            "imageParams": {
-                "width": 300,
-                "height": 300
+            "Data": {
+                "amount": amount,
+                "currency": "RUB",
+                "paymentPurpose": payment_purpose,
+                "qrcType": "02",  # Динамический QR-код
+                "imageParams": {
+                    "width": 300,
+                    "height": 300,
+                    "mediaType": "image/png"
+                },
+                "sourceName": "EcoCamp Bot",
+                "ttl": 30  # Время жизни QR-кода - 30 минут
             }
         }
         
-        response = requests.post(url, headers=_get_headers(), json=data)
+        logger.info(f"Отправка запроса на регистрацию QR-кода: URL={url}")
+        logger.info(f"Тело запроса: {json.dumps(data)}")
+        
+        response = requests.post(url, headers=headers, json=data)
+        
+        logger.info(f"Получен ответ: статус {response.status_code}")
+        if response.status_code != 200:
+            logger.error(f"Ошибка ответа: {response.text}")
+            
         response.raise_for_status()
-        return response.json()
+        response_data = response.json()
+        
+        # Проверка структуры ответа
+        if 'Data' not in response_data:
+            logger.error(f"Неожиданный формат ответа: {response_data}")
+            return {"error": "Неожиданный формат ответа"}
+            
+        return response_data['Data']
     except Exception as e:
         logger.error(f"Ошибка при создании QR-кода: {e}")
         return {}
@@ -88,14 +131,35 @@ def get_qr_code_status(qrc_id: str) -> Dict[str, Any]:
         Dict[str, Any]: Статус QR-кода
     """
     try:
-        url = f"{BASE_URL}/sbp/qr-code/payment-status"
-        params = {
-            "qrcId": qrc_id
-        }
+        # Формирование URL запроса в соответствии с документацией
+        url = f"{BASE_URL}/sbp/{API_VERSION}/qr-codes/{qrc_id}/payment-status"
         
-        response = requests.get(url, headers=_get_headers(), params=params)
+        headers = _get_headers()
+        if not headers:
+            return {"error": "JWT токен не настроен"}
+            
+        logger.info(f"Отправка запроса на получение статуса: URL={url}")
+        
+        response = requests.get(url, headers=headers)
+        
+        logger.info(f"Получен ответ: статус {response.status_code}")
+        if response.status_code != 200:
+            logger.error(f"Ошибка ответа: {response.text}")
+            
         response.raise_for_status()
-        return response.json()
+        response_data = response.json()
+        
+        # Проверка структуры ответа
+        if 'Data' not in response_data or 'paymentList' not in response_data['Data']:
+            logger.error(f"Неожиданный формат ответа: {response_data}")
+            return {"error": "Неожиданный формат ответа"}
+            
+        # Получаем статус из первого элемента списка платежей
+        payment_list = response_data['Data']['paymentList']
+        if payment_list and len(payment_list) > 0:
+            return payment_list[0]
+        else:
+            return {"status": "unknown", "message": "Платеж не найден"}
     except Exception as e:
         logger.error(f"Ошибка при получении статуса QR-кода: {e}")
         return {} 
