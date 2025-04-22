@@ -23,6 +23,11 @@ logger = logging.getLogger(__name__)
 PAYMENT_CHECK_INTERVAL = 10
 PAYMENT_MAX_CHECKS = 12  # 2 минуты максимум (12 * 10 секунд)
 
+# Максимальное число попыток проверки статуса
+MAX_STATUS_CHECKS = 10
+# Интервал между проверками в секундах
+STATUS_CHECK_INTERVAL = 15
+
 @require_auth
 async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
@@ -121,7 +126,8 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             'amount': total_sum,
             'orders': [order[0] for order in user_orders],  # Список ID заказов
             'created_at': datetime.now().isoformat(),
-            'payload': qr_data.get('payload', '')
+            'payload': qr_data.get('payload', ''),
+            'status_checks': 0  # Счетчик проверок статуса
         }
         
         # Декодируем изображение QR-кода из base64
@@ -230,6 +236,153 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return MENU
 
+# Функция для автоматической проверки статуса платежа
+async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Автоматически проверяет статус оплаты с заданным интервалом
+    
+    Args:
+        context: Контекст бота
+    """
+    job = context.job
+    chat_id = job.data['chat_id']
+    message_id = job.data['message_id']
+    user_data = job.data['user_data']
+    
+    try:
+        # Проверяем, есть ли данные о платеже
+        if 'payment' not in user_data or 'qrc_id' not in user_data['payment']:
+            # Платеж не найден, отменяем задачу
+            logger.info(f"Автопроверка: данные о платеже не найдены")
+            return
+        
+        # Увеличиваем счетчик проверок
+        user_data['payment']['status_checks'] += 1
+        
+        # Проверяем, не превышено ли максимальное число попыток
+        if user_data['payment']['status_checks'] > MAX_STATUS_CHECKS:
+            logger.info(f"Автопроверка: достигнуто максимальное число попыток ({MAX_STATUS_CHECKS})")
+            
+            # Отправляем сообщение о превышении числа попыток
+            keyboard = [
+                [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
+                [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text="Автоматическая проверка завершена. Нажмите кнопку для ручной проверки статуса.",
+                reply_markup=reply_markup
+            )
+            
+            # Отменяем задачу
+            return
+        
+        # Проверяем статус оплаты
+        qrc_id = user_data['payment']['qrc_id']
+        logger.info(f"Автопроверка: запрос статуса QR-кода {qrc_id}, попытка {user_data['payment']['status_checks']}")
+        
+        status_data = sbp.get_qr_code_status(qrc_id)
+        
+        if not status_data:
+            logger.warning(f"Автопроверка: не удалось получить статус оплаты")
+            return
+        
+        # Проверяем статус платежа
+        payment_status = status_data.get('status', '').lower()
+        payment_message = status_data.get('message', '')
+        
+        logger.info(f"Автопроверка: статус платежа {payment_status}, сообщение: {payment_message}")
+        
+        if payment_status == 'paid':
+            # Оплата успешна, обновляем статусы заказов
+            orders_sheet = get_orders_sheet()
+            all_orders = orders_sheet.get_all_values()
+            
+            for order_id in user_data['payment']['orders']:
+                for idx, row in enumerate(all_orders):
+                    if row[0] == order_id and row[2] in ['Принят', 'Активен']:
+                        # Обновляем статус заказа на "Оплачен"
+                        orders_sheet.update_cell(idx + 1, 3, 'Оплачен')
+            
+            # Отправляем сообщение об успешной оплате
+            keyboard = [
+                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
+                [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=translations.get_message('payment_success'),
+                reply_markup=reply_markup
+            )
+            
+            # Очищаем данные о платеже
+            if 'payment' in user_data:
+                del user_data['payment']
+            
+            # Отменяем задачу
+            return
+            
+        elif payment_status == 'rejected':
+            # Платеж отклонен
+            message_text = (
+                f"Платеж отклонен.\n"
+                f"Причина: {payment_message}\n\n"
+                f"Попробуйте создать новый платеж или выберите другой способ оплаты."
+            )
+            keyboard = [
+                [InlineKeyboardButton(translations.get_button('pay_orders'), callback_data='pay_orders')],
+                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=message_text,
+                reply_markup=reply_markup
+            )
+            
+            # Очищаем данные о платеже
+            if 'payment' in user_data:
+                del user_data['payment']
+            
+            # Отменяем задачу
+            return
+            
+        elif payment_status == 'expired':
+            # Время действия QR-кода истекло
+            keyboard = [
+                [InlineKeyboardButton(translations.get_button('pay_orders'), callback_data='pay_orders')],
+                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=translations.get_message('payment_expired'),
+                reply_markup=reply_markup
+            )
+            
+            # Очищаем данные о платеже
+            if 'payment' in user_data:
+                del user_data['payment']
+            
+            # Отменяем задачу
+            return
+        
+        # Для других статусов просто ждем, не обновляем сообщение
+        # Состояние обновится при следующей попытке или пользователь может проверить вручную
+            
+    except Exception as e:
+        logger.error(f"Ошибка при автоматической проверке статуса оплаты: {e}")
+
 @require_auth
 async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
@@ -265,6 +418,9 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
         qrc_id = context.user_data['payment']['qrc_id']
         status_data = sbp.get_qr_code_status(qrc_id)
         
+        # Логируем полный ответ для отладки
+        logger.info(f"Получен ответ о статусе платежа: {status_data}")
+        
         if not status_data:
             # Ошибка при получении статуса
             keyboard = [
@@ -280,6 +436,9 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
         
         # Проверяем статус платежа
         payment_status = status_data.get('status', '').lower()
+        payment_message = status_data.get('message', '')
+        
+        logger.info(f"Статус платежа: {payment_status}, сообщение: {payment_message}")
         
         if payment_status == 'paid':
             # Оплата успешна
@@ -327,18 +486,84 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
                 del context.user_data['payment']
             
             return MENU
-            
-        else:
-            # Платеж в процессе или другой статус
+        
+        elif payment_status == 'notstarted':
+            # Платеж еще не начат
+            message_text = (
+                f"Платеж еще не начат. Пожалуйста, отсканируйте QR-код и выполните оплату.\n\n"
+                f"Статус: {payment_message}"
+            )
             keyboard = [
                 [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
                 [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(
-                translations.get_message('payment_waiting'),
-                reply_markup=reply_markup
+            
+            response = await query.edit_message_text(message_text, reply_markup=reply_markup)
+            
+            # Запускаем автоматическую проверку
+            start_auto_check_payment(context, update.effective_chat.id, response.message_id, context.user_data)
+            
+            return PAYMENT
+            
+        elif payment_status == 'rejected':
+            # Платеж отклонен
+            message_text = (
+                f"Платеж отклонен.\n"
+                f"Причина: {payment_message}\n\n"
+                f"Попробуйте создать новый платеж или выберите другой способ оплаты."
             )
+            keyboard = [
+                [InlineKeyboardButton(translations.get_button('pay_orders'), callback_data='pay_orders')],
+                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(message_text, reply_markup=reply_markup)
+            
+            # Очищаем данные о платеже
+            if 'payment' in context.user_data:
+                del context.user_data['payment']
+                
+            return MENU
+        
+        elif payment_status == 'pending':
+            # Платеж в процессе
+            message_text = (
+                f"Платеж обрабатывается банком.\n"
+                f"Статус: {payment_message}\n\n"
+                f"Пожалуйста, дождитесь завершения операции."
+            )
+            keyboard = [
+                [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
+                [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            response = await query.edit_message_text(message_text, reply_markup=reply_markup)
+            
+            # Запускаем автоматическую проверку
+            start_auto_check_payment(context, update.effective_chat.id, response.message_id, context.user_data)
+            
+            return PAYMENT
+            
+        else:
+            # Другой статус (unknown и др.)
+            message_text = (
+                f"Ожидаем подтверждение оплаты...\n"
+                f"Статус: {payment_status}\n"
+                f"Сообщение: {payment_message}"
+            )
+            keyboard = [
+                [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
+                [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            response = await query.edit_message_text(message_text, reply_markup=reply_markup)
+            
+            # Запускаем автоматическую проверку
+            start_auto_check_payment(context, update.effective_chat.id, response.message_id, context.user_data)
+            
             return PAYMENT
             
     except Exception as e:
@@ -354,6 +579,36 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return PAYMENT
 
+def start_auto_check_payment(context, chat_id, message_id, user_data):
+    """
+    Запускает автоматическую проверку статуса платежа
+    
+    Args:
+        context: Контекст бота
+        chat_id: ID чата
+        message_id: ID сообщения для обновления
+        user_data: Данные пользователя
+    """
+    # Сначала остановим предыдущие задачи с этим именем, если они есть
+    job_name = f"payment_check_{chat_id}"
+    current_jobs = context.job_queue.get_jobs_by_name(job_name)
+    for job in current_jobs:
+        job.schedule_removal()
+    
+    # Запускаем новую задачу
+    context.job_queue.run_repeating(
+        auto_check_payment_status,
+        interval=STATUS_CHECK_INTERVAL,
+        first=STATUS_CHECK_INTERVAL,
+        data={
+            'chat_id': chat_id,
+            'message_id': message_id,
+            'user_data': user_data
+        },
+        name=job_name
+    )
+    logger.info(f"Запущена автоматическая проверка статуса платежа для chat_id={chat_id}")
+
 @require_auth
 async def cancel_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
@@ -368,6 +623,12 @@ async def cancel_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     """
     query = update.callback_query
     await query.answer()
+    
+    # Останавливаем автоматическую проверку
+    job_name = f"payment_check_{update.effective_chat.id}"
+    current_jobs = context.job_queue.get_jobs_by_name(job_name)
+    for job in current_jobs:
+        job.schedule_removal()
     
     # Очищаем данные о платеже
     if 'payment' in context.user_data:

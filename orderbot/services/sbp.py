@@ -59,7 +59,7 @@ def register_qr_code(account_id: str, merchant_id: str, amount: int,
     Регистрирует динамический QR-код для оплаты
     
     Args:
-        account_id: Идентификатор счета
+        account_id: Идентификатор счета в формате "номер_счета/БИК"
         merchant_id: Идентификатор торговой точки
         amount: Сумма платежа в копейках
         payment_purpose: Назначение платежа
@@ -72,6 +72,11 @@ def register_qr_code(account_id: str, merchant_id: str, amount: int,
         if not account_id or not merchant_id:
             logger.error(f"Не указаны обязательные параметры: account_id={account_id}, merchant_id={merchant_id}")
             return {"error": "Не указаны обязательные параметры"}
+        
+        # Проверка формата account_id (должен быть в формате "номер_счета/БИК")
+        if "/" not in account_id:
+            logger.error(f"Неверный формат account_id: {account_id}. Должен быть в формате 'номер_счета/БИК'")
+            return {"error": "Неверный формат идентификатора счета"}
             
         # Формирование URL запроса в соответствии с документацией
         url = f"{BASE_URL}/sbp/{API_VERSION}/qr-code/merchant/{merchant_id}/{account_id}"
@@ -143,23 +148,40 @@ def get_qr_code_status(qrc_id: str) -> Dict[str, Any]:
         response = requests.get(url, headers=headers)
         
         logger.info(f"Получен ответ: статус {response.status_code}")
+        
         if response.status_code != 200:
             logger.error(f"Ошибка ответа: {response.text}")
+            return {"error": f"Ошибка API: {response.status_code}", "message": response.text}
             
         response.raise_for_status()
         response_data = response.json()
         
+        # Подробное логирование ответа для отладки
+        logger.info(f"Полный ответ API: {json.dumps(response_data, ensure_ascii=False)}")
+        
         # Проверка структуры ответа
-        if 'Data' not in response_data or 'paymentList' not in response_data['Data']:
-            logger.error(f"Неожиданный формат ответа: {response_data}")
-            return {"error": "Неожиданный формат ответа"}
+        if 'Data' not in response_data:
+            logger.error(f"Отсутствует ключ 'Data' в ответе: {response_data}")
+            return {"error": "Неожиданный формат ответа: отсутствует ключ 'Data'"}
+            
+        if 'paymentList' not in response_data['Data']:
+            logger.error(f"Отсутствует ключ 'paymentList' в Data: {response_data['Data']}")
+            return {"error": "Неожиданный формат ответа: отсутствует ключ 'paymentList'"}
             
         # Получаем статус из первого элемента списка платежей
         payment_list = response_data['Data']['paymentList']
-        if payment_list and len(payment_list) > 0:
-            return payment_list[0]
+        
+        if not payment_list:
+            logger.warning(f"Список платежей пуст для QR-кода {qrc_id}")
+            return {"status": "unknown", "message": "Платеж не найден"}
+            
+        if len(payment_list) > 0:
+            payment = payment_list[0]
+            logger.info(f"Информация о платеже: {json.dumps(payment, ensure_ascii=False)}")
+            return payment
         else:
+            logger.warning(f"Список платежей пуст для QR-кода {qrc_id}")
             return {"status": "unknown", "message": "Платеж не найден"}
     except Exception as e:
         logger.error(f"Ошибка при получении статуса QR-кода: {e}")
-        return {} 
+        return {"error": str(e), "message": "Ошибка при обработке запроса"} 
