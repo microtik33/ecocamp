@@ -52,6 +52,9 @@ tracemalloc.start()
 MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 os.environ['TZ'] = 'Europe/Moscow'
 
+# Глобальная переменная для отслеживания доступности job_queue
+HAVE_JOB_QUEUE = False
+
 async def keep_alive():
     """Поддерживает сервис активным, выполняя HTTP-запросы каждые 10 минут."""
     webhook_url = os.getenv('RENDER_EXTERNAL_URL')
@@ -76,13 +79,16 @@ async def main() -> None:
     try:
         await application.initialize()
         
-        # Явно инициализируем job_queue, если он не был инициализирован
+        # Проверяем, можно ли использовать job_queue, но не пытаемся создать его вручную,
+        # если он не поддерживается
+        global HAVE_JOB_QUEUE
+        HAVE_JOB_QUEUE = True
+        
         if application.job_queue is None:
-            logging.warning("JobQueue не инициализирован, создаем его вручную")
-            from telegram.ext import JobQueue
-            application.job_queue = JobQueue()
-            application.job_queue.set_application(application)
-            asyncio.create_task(application.job_queue.start())
+            logging.warning("JobQueue не инициализирован. Автоматическая проверка статуса платежей будет недоступна.")
+            logging.warning("Для включения JobQueue установите: pip install \"python-telegram-bot[job-queue]\"")
+            HAVE_JOB_QUEUE = False
+            # Не пытаемся создать его вручную, так как это вызовет ошибку
 
         # Запускаем задачу обновления статусов заказов
         start_status_update_task()

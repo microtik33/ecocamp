@@ -610,31 +610,35 @@ def start_auto_check_payment(context, chat_id, message_id, user_data):
     Returns:
         bool: True если задача успешно запущена, False в противном случае
     """
-    # Проверяем, доступна ли job_queue
+    # Проверяем, доступна ли job_queue в контексте
     if not context.job_queue:
-        logger.warning(f"job_queue недоступен, автоматическая проверка невозможна для chat_id={chat_id}")
+        logger.warning(f"job_queue недоступен в контексте, автоматическая проверка невозможна для chat_id={chat_id}")
         return False
         
     # Сначала остановим предыдущие задачи с этим именем, если они есть
-    job_name = f"payment_check_{chat_id}"
-    current_jobs = context.job_queue.get_jobs_by_name(job_name)
-    for job in current_jobs:
-        job.schedule_removal()
-    
-    # Запускаем новую задачу
-    context.job_queue.run_repeating(
-        auto_check_payment_status,
-        interval=STATUS_CHECK_INTERVAL,
-        first=STATUS_CHECK_INTERVAL,
-        data={
-            'chat_id': chat_id,
-            'message_id': message_id,
-            'user_data': user_data
-        },
-        name=job_name
-    )
-    logger.info(f"Запущена автоматическая проверка статуса платежа для chat_id={chat_id}")
-    return True
+    try:
+        job_name = f"payment_check_{chat_id}"
+        current_jobs = context.job_queue.get_jobs_by_name(job_name)
+        for job in current_jobs:
+            job.schedule_removal()
+        
+        # Запускаем новую задачу
+        context.job_queue.run_repeating(
+            auto_check_payment_status,
+            interval=STATUS_CHECK_INTERVAL,
+            first=STATUS_CHECK_INTERVAL,
+            data={
+                'chat_id': chat_id,
+                'message_id': message_id,
+                'user_data': user_data
+            },
+            name=job_name
+        )
+        logger.info(f"Запущена автоматическая проверка статуса платежа для chat_id={chat_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка при настройке автоматической проверки статуса: {e}")
+        return False
 
 @require_auth
 async def cancel_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -653,10 +657,13 @@ async def cancel_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     # Останавливаем автоматическую проверку, если job_queue доступен
     if context.job_queue:
-        job_name = f"payment_check_{update.effective_chat.id}"
-        current_jobs = context.job_queue.get_jobs_by_name(job_name)
-        for job in current_jobs:
-            job.schedule_removal()
+        try:
+            job_name = f"payment_check_{update.effective_chat.id}"
+            current_jobs = context.job_queue.get_jobs_by_name(job_name)
+            for job in current_jobs:
+                job.schedule_removal()
+        except Exception as e:
+            logger.warning(f"Ошибка при остановке автоматической проверки: {e}")
     else:
         logger.warning(f"job_queue недоступен при отмене платежа для chat_id={update.effective_chat.id}")
     
