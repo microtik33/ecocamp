@@ -97,7 +97,7 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     amount_kopecks = int(total_sum * 100)
     
     # Формируем назначение платежа
-    payment_purpose = f"Оплата заказов в EcoCamp (пользователь {user_id})"
+    payment_purpose = f"Оплата заказа"
     
     try:
         # Создаем QR-код
@@ -389,6 +389,18 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
                         # Обновляем статус заказа на "Оплачен"
                         orders_sheet.update_cell(idx + 1, 3, 'Оплачен')
             
+            # Удаляем сообщение с QR-кодом, если оно есть
+            try:
+                if 'qr_message_id' in user_data['payment']:
+                    qr_message_id = user_data['payment']['qr_message_id']
+                    await context.bot.delete_message(
+                        chat_id=chat_id,
+                        message_id=qr_message_id
+                    )
+                    logger.info(f"Сообщение с QR-кодом {qr_message_id} успешно удалено после успешной оплаты")
+            except Exception as e:
+                logger.warning(f"Не удалось удалить сообщение с QR-кодом после успешной оплаты: {e}")
+            
             # Отправляем сообщение об успешной оплате
             keyboard = [
                 [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
@@ -559,6 +571,18 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
                     if row[0] == order_id and row[2] in ['Принят', 'Активен']:
                         # Обновляем статус заказа на "Оплачен"
                         orders_sheet.update_cell(idx + 1, 3, 'Оплачен')
+            
+            # Удаляем сообщение с QR-кодом, если оно есть
+            try:
+                if 'qr_message_id' in context.user_data['payment']:
+                    qr_message_id = context.user_data['payment']['qr_message_id']
+                    await context.bot.delete_message(
+                        chat_id=update.effective_chat.id,
+                        message_id=qr_message_id
+                    )
+                    logger.info(f"Сообщение с QR-кодом {qr_message_id} успешно удалено после успешной оплаты")
+            except Exception as e:
+                logger.warning(f"Не удалось удалить сообщение с QR-кодом после успешной оплаты: {e}")
             
             # Отправляем сообщение об успешной оплате
             keyboard = [
