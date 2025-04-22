@@ -190,6 +190,14 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 context.user_data['payment']['qr_message_id'] = qr_message.message_id
                 context.user_data['payment']['buttons_message_id'] = buttons_message.message_id
                 
+                # Запускаем автоматическую проверку статуса платежа
+                try:
+                    auto_check_success = start_auto_check_payment(context, update.effective_chat.id, context.user_data)
+                    if not auto_check_success:
+                        logger.info(f"Не удалось запустить автоматическую проверку платежа при создании")
+                except Exception as e:
+                    logger.error(f"Ошибка при запуске автоматической проверки платежа: {e}")
+                
                 return PAYMENT
                 
             except Exception as e:
@@ -233,6 +241,14 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 context.user_data['payment']['qr_message_id'] = qr_message.message_id
                 context.user_data['payment']['buttons_message_id'] = buttons_message.message_id
                 
+                # Запускаем автоматическую проверку статуса платежа
+                try:
+                    auto_check_success = start_auto_check_payment(context, update.effective_chat.id, context.user_data)
+                    if not auto_check_success:
+                        logger.info(f"Не удалось запустить автоматическую проверку платежа при создании")
+                except Exception as e:
+                    logger.error(f"Ошибка при запуске автоматической проверки платежа: {e}")
+                
                 return PAYMENT
         
         # Если изображения нет, отправляем только текст со ссылкой
@@ -272,6 +288,14 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Сохраняем ID обоих сообщений в контексте
         context.user_data['payment']['qr_message_id'] = qr_message.message_id
         context.user_data['payment']['buttons_message_id'] = buttons_message.message_id
+        
+        # Запускаем автоматическую проверку статуса платежа
+        try:
+            auto_check_success = start_auto_check_payment(context, update.effective_chat.id, context.user_data)
+            if not auto_check_success:
+                logger.info(f"Не удалось запустить автоматическую проверку платежа при создании")
+        except Exception as e:
+            logger.error(f"Ошибка при запуске автоматической проверки платежа: {e}")
         
         return PAYMENT
         
