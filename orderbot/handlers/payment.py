@@ -501,8 +501,14 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             
             response = await query.edit_message_text(message_text, reply_markup=reply_markup)
             
-            # Запускаем автоматическую проверку
-            start_auto_check_payment(context, update.effective_chat.id, response.message_id, context.user_data)
+            # Пробуем запустить автоматическую проверку, если job_queue доступен
+            try:
+                auto_check_success = start_auto_check_payment(context, update.effective_chat.id, response.message_id, context.user_data)
+                if not auto_check_success:
+                    logger.info("Автоматическая проверка не запущена. Пользователь должен проверить статус вручную.")
+            except Exception as e:
+                logger.warning(f"Не удалось запустить автоматическую проверку: {e}")
+                # При ошибке просто продолжаем, пользователь может проверить статус вручную
             
             return PAYMENT
             
@@ -541,8 +547,14 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             
             response = await query.edit_message_text(message_text, reply_markup=reply_markup)
             
-            # Запускаем автоматическую проверку
-            start_auto_check_payment(context, update.effective_chat.id, response.message_id, context.user_data)
+            # Пробуем запустить автоматическую проверку, если job_queue доступен
+            try:
+                auto_check_success = start_auto_check_payment(context, update.effective_chat.id, response.message_id, context.user_data)
+                if not auto_check_success:
+                    logger.info("Автоматическая проверка не запущена. Пользователь должен проверить статус вручную.")
+            except Exception as e:
+                logger.warning(f"Не удалось запустить автоматическую проверку: {e}")
+                # При ошибке просто продолжаем, пользователь может проверить статус вручную
             
             return PAYMENT
             
@@ -561,8 +573,14 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             
             response = await query.edit_message_text(message_text, reply_markup=reply_markup)
             
-            # Запускаем автоматическую проверку
-            start_auto_check_payment(context, update.effective_chat.id, response.message_id, context.user_data)
+            # Пробуем запустить автоматическую проверку, если job_queue доступен
+            try:
+                auto_check_success = start_auto_check_payment(context, update.effective_chat.id, response.message_id, context.user_data)
+                if not auto_check_success:
+                    logger.info("Автоматическая проверка не запущена. Пользователь должен проверить статус вручную.")
+            except Exception as e:
+                logger.warning(f"Не удалось запустить автоматическую проверку: {e}")
+                # При ошибке просто продолжаем, пользователь может проверить статус вручную
             
             return PAYMENT
             
@@ -588,7 +606,15 @@ def start_auto_check_payment(context, chat_id, message_id, user_data):
         chat_id: ID чата
         message_id: ID сообщения для обновления
         user_data: Данные пользователя
+        
+    Returns:
+        bool: True если задача успешно запущена, False в противном случае
     """
+    # Проверяем, доступна ли job_queue
+    if not context.job_queue:
+        logger.warning(f"job_queue недоступен, автоматическая проверка невозможна для chat_id={chat_id}")
+        return False
+        
     # Сначала остановим предыдущие задачи с этим именем, если они есть
     job_name = f"payment_check_{chat_id}"
     current_jobs = context.job_queue.get_jobs_by_name(job_name)
@@ -608,6 +634,7 @@ def start_auto_check_payment(context, chat_id, message_id, user_data):
         name=job_name
     )
     logger.info(f"Запущена автоматическая проверка статуса платежа для chat_id={chat_id}")
+    return True
 
 @require_auth
 async def cancel_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -624,11 +651,14 @@ async def cancel_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     query = update.callback_query
     await query.answer()
     
-    # Останавливаем автоматическую проверку
-    job_name = f"payment_check_{update.effective_chat.id}"
-    current_jobs = context.job_queue.get_jobs_by_name(job_name)
-    for job in current_jobs:
-        job.schedule_removal()
+    # Останавливаем автоматическую проверку, если job_queue доступен
+    if context.job_queue:
+        job_name = f"payment_check_{update.effective_chat.id}"
+        current_jobs = context.job_queue.get_jobs_by_name(job_name)
+        for job in current_jobs:
+            job.schedule_removal()
+    else:
+        logger.warning(f"job_queue недоступен при отмене платежа для chat_id={update.effective_chat.id}")
     
     # Очищаем данные о платеже
     if 'payment' in context.user_data:

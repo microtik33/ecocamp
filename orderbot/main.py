@@ -70,11 +70,19 @@ async def keep_alive():
 
 async def main() -> None:
     """Запуск бота."""
-    # Инициализация приложения
+    # Инициализация приложения с явным включением JobQueue
     application = Application.builder().token(config.BOT_TOKEN).build()
     
     try:
         await application.initialize()
+        
+        # Явно инициализируем job_queue, если он не был инициализирован
+        if application.job_queue is None:
+            logging.warning("JobQueue не инициализирован, создаем его вручную")
+            from telegram.ext import JobQueue
+            application.job_queue = JobQueue()
+            application.job_queue.set_application(application)
+            asyncio.create_task(application.job_queue.start())
 
         # Запускаем задачу обновления статусов заказов
         start_status_update_task()
