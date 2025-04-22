@@ -147,93 +147,132 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 image.save(buffer, format='PNG')
                 buffer.seek(0)
                 
-                # Формируем сообщение с QR-кодом
+                # Формируем сообщение с QR-кодом и суммой (выделенной жирным)
                 message_text = (
                     f"{translations.get_message('payment_qr_created')}\n\n"
-                    f"Сумма к оплате: {total_sum} руб.\n\n"
-                    f"{translations.get_message('payment_instructions')}"
+                    f"Сумма к оплате: *{total_sum} руб.*\n\n"
                 )
                 
-                # Добавляем клавиатуру
+                # Добавляем ссылку на оплату, если она есть
+                payment_url = context.user_data['payment'].get('payload', '')
+                if payment_url:
+                    message_text += f"Ссылка для оплаты: {payment_url}\n\n"
+                
+                message_text += translations.get_message('payment_instructions')
+                
+                # Удаляем старое сообщение
+                await query.delete_message()
+                
+                # 1. Отправляем сообщение с QR-кодом и информацией о платеже (без кнопок)
+                # Используем parse_mode=MarkdownV2 для выделения суммы жирным шрифтом
+                qr_message = await context.bot.send_photo(
+                    chat_id=update.effective_chat.id,
+                    photo=buffer,
+                    caption=message_text,
+                    parse_mode='Markdown'  # Используем Markdown для выделения жирным
+                )
+                
+                # 2. Отправляем отдельное сообщение с кнопками управления платежом
                 keyboard = [
                     [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
                     [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
-                # Сохраняем ссылку на оплату в отдельное сообщение
-                payment_url = None
-                if context.user_data['payment'].get('payload'):
-                    payment_url = context.user_data['payment']['payload']
-                    # Отправляем сначала QR-код
-                    await query.delete_message()
-                    await context.bot.send_photo(
-                        chat_id=update.effective_chat.id,
-                        photo=buffer,
-                        caption=message_text,
-                        reply_markup=reply_markup
-                    )
-                    
-                    # Затем ссылку отдельным сообщением
-                    await context.bot.send_message(
-                        chat_id=update.effective_chat.id,
-                        text=f"Ссылка для оплаты: {payment_url}"
-                    )
-                else:
-                    # Если ссылки нет, отправляем только QR-код
-                    await query.delete_message()
-                    await context.bot.send_photo(
-                        chat_id=update.effective_chat.id,
-                        photo=buffer,
-                        caption=message_text,
-                        reply_markup=reply_markup
-                    )
+                # Сохраняем ID сообщения с кнопками в контексте пользователя
+                buttons_message = await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text="Для управления платежом используйте кнопки ниже:",
+                    reply_markup=reply_markup
+                )
+                
+                # Сохраняем ID обоих сообщений в контексте
+                context.user_data['payment']['qr_message_id'] = qr_message.message_id
+                context.user_data['payment']['buttons_message_id'] = buttons_message.message_id
                 
                 return PAYMENT
                 
             except Exception as e:
                 logger.error(f"Ошибка при обработке изображения QR-кода: {e}")
                 
-                # Отправляем сообщение только с текстом и ссылкой
+                # В случае ошибки с изображением отправляем текстовое сообщение с информацией
                 message_text = (
                     f"{translations.get_message('payment_qr_created')}\n\n"
-                    f"Сумма к оплате: {total_sum} руб.\n\n"
+                    f"Сумма к оплате: *{total_sum} руб.*\n\n"
                 )
                 
-                if context.user_data['payment'].get('payload'):
-                    message_text += f"\nСсылка для оплаты: {context.user_data['payment']['payload']}\n\n"
+                # Добавляем ссылку на оплату, если она есть
+                payment_url = context.user_data['payment'].get('payload', '')
+                if payment_url:
+                    message_text += f"Ссылка для оплаты: {payment_url}\n\n"
                 
                 message_text += translations.get_message('payment_instructions')
                 
-                # Добавляем клавиатуру
+                # 1. Отправляем текстовое сообщение с информацией о платеже
+                await query.delete_message()
+                qr_message = await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=message_text,
+                    parse_mode='Markdown'
+                )
+                
+                # 2. Отправляем отдельное сообщение с кнопками управления платежом
                 keyboard = [
                     [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
                     [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
-                await query.edit_message_text(message_text, reply_markup=reply_markup)
+                buttons_message = await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text="Для управления платежом используйте кнопки ниже:",
+                    reply_markup=reply_markup
+                )
+                
+                # Сохраняем ID обоих сообщений в контексте
+                context.user_data['payment']['qr_message_id'] = qr_message.message_id
+                context.user_data['payment']['buttons_message_id'] = buttons_message.message_id
+                
                 return PAYMENT
         
         # Если изображения нет, отправляем только текст со ссылкой
         message_text = (
             f"{translations.get_message('payment_qr_created')}\n\n"
-            f"Сумма к оплате: {total_sum} руб.\n\n"
+            f"Сумма к оплате: *{total_sum} руб.*\n\n"
         )
         
-        if context.user_data['payment'].get('payload'):
-            message_text += f"\nСсылка для оплаты: {context.user_data['payment']['payload']}\n\n"
+        # Добавляем ссылку на оплату, если она есть
+        payment_url = context.user_data['payment'].get('payload', '')
+        if payment_url:
+            message_text += f"Ссылка для оплаты: {payment_url}\n\n"
         
         message_text += translations.get_message('payment_instructions')
         
-        # Добавляем клавиатуру
+        # 1. Отправляем текстовое сообщение с информацией о платеже
+        await query.delete_message()
+        qr_message = await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=message_text,
+            parse_mode='Markdown'
+        )
+        
+        # 2. Отправляем отдельное сообщение с кнопками управления платежом
         keyboard = [
             [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
             [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await query.edit_message_text(message_text, reply_markup=reply_markup)
+        buttons_message = await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Для управления платежом используйте кнопки ниже:",
+            reply_markup=reply_markup
+        )
+        
+        # Сохраняем ID обоих сообщений в контексте
+        context.user_data['payment']['qr_message_id'] = qr_message.message_id
+        context.user_data['payment']['buttons_message_id'] = buttons_message.message_id
+        
         return PAYMENT
         
     except Exception as e:
@@ -270,6 +309,13 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
         # Увеличиваем счетчик проверок
         user_data['payment']['status_checks'] += 1
         
+        # Проверяем наличие ID сообщения с кнопками
+        if 'buttons_message_id' not in user_data['payment']:
+            logger.warning(f"Автопроверка: не найден ID сообщения с кнопками")
+            return
+            
+        buttons_message_id = user_data['payment']['buttons_message_id']
+        
         # Проверяем, не превышено ли максимальное число попыток
         if user_data['payment']['status_checks'] > MAX_STATUS_CHECKS:
             logger.info(f"Автопроверка: достигнуто максимальное число попыток ({MAX_STATUS_CHECKS})")
@@ -281,8 +327,10 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            await context.bot.send_message(
+            # Обновляем сообщение с кнопками
+            await context.bot.edit_message_text(
                 chat_id=chat_id,
+                message_id=buttons_message_id,
                 text="Автоматическая проверка завершена. Нажмите кнопку для ручной проверки статуса.",
                 reply_markup=reply_markup
             )
@@ -324,8 +372,10 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            await context.bot.send_message(
+            # Обновляем сообщение с кнопками
+            await context.bot.edit_message_text(
                 chat_id=chat_id,
+                message_id=buttons_message_id,
                 text=translations.get_message('payment_success'),
                 reply_markup=reply_markup
             )
@@ -350,8 +400,10 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            await context.bot.send_message(
+            # Обновляем сообщение с кнопками
+            await context.bot.edit_message_text(
                 chat_id=chat_id,
+                message_id=buttons_message_id,
                 text=message_text,
                 reply_markup=reply_markup
             )
@@ -371,8 +423,10 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            await context.bot.send_message(
+            # Обновляем сообщение с кнопками
+            await context.bot.edit_message_text(
                 chat_id=chat_id,
+                message_id=buttons_message_id,
                 text=translations.get_message('payment_expired'),
                 reply_markup=reply_markup
             )
@@ -418,9 +472,26 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return MENU
     
-    # Отправляем сообщение о проверке статуса
-    status_message = await context.bot.send_message(
+    # Проверяем наличие ID сообщения с кнопками в контексте
+    if 'buttons_message_id' not in context.user_data['payment']:
+        # Если ID нет в контексте, создаем новое сообщение для кнопок
+        keyboard = [
+            [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
+            [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        buttons_message = await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Для управления платежом используйте кнопки ниже:",
+            reply_markup=reply_markup
+        )
+        context.user_data['payment']['buttons_message_id'] = buttons_message.message_id
+    
+    # Временно редактируем сообщение, чтобы показать процесс проверки
+    buttons_message_id = context.user_data['payment']['buttons_message_id']
+    await context.bot.edit_message_text(
         chat_id=update.effective_chat.id,
+        message_id=buttons_message_id,
         text=translations.get_message('payment_status_check')
     )
     
@@ -441,7 +512,7 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             reply_markup = InlineKeyboardMarkup(keyboard)
             await context.bot.edit_message_text(
                 chat_id=update.effective_chat.id,
-                message_id=status_message.message_id,
+                message_id=buttons_message_id,
                 text="Не удалось получить статус оплаты. Попробуйте еще раз.",
                 reply_markup=reply_markup
             )
@@ -473,7 +544,7 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             reply_markup = InlineKeyboardMarkup(keyboard)
             await context.bot.edit_message_text(
                 chat_id=update.effective_chat.id,
-                message_id=status_message.message_id,
+                message_id=buttons_message_id,
                 text=translations.get_message('payment_success'),
                 reply_markup=reply_markup
             )
@@ -493,7 +564,7 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             reply_markup = InlineKeyboardMarkup(keyboard)
             await context.bot.edit_message_text(
                 chat_id=update.effective_chat.id,
-                message_id=status_message.message_id,
+                message_id=buttons_message_id,
                 text=translations.get_message('payment_expired'),
                 reply_markup=reply_markup
             )
@@ -516,9 +587,9 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            updated_message = await context.bot.edit_message_text(
+            await context.bot.edit_message_text(
                 chat_id=update.effective_chat.id,
-                message_id=status_message.message_id,
+                message_id=buttons_message_id,
                 text=message_text,
                 reply_markup=reply_markup
             )
@@ -548,7 +619,7 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             reply_markup = InlineKeyboardMarkup(keyboard)
             await context.bot.edit_message_text(
                 chat_id=update.effective_chat.id,
-                message_id=status_message.message_id,
+                message_id=buttons_message_id,
                 text=message_text,
                 reply_markup=reply_markup
             )
@@ -572,9 +643,9 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            updated_message = await context.bot.edit_message_text(
+            await context.bot.edit_message_text(
                 chat_id=update.effective_chat.id,
-                message_id=status_message.message_id,
+                message_id=buttons_message_id,
                 text=message_text,
                 reply_markup=reply_markup
             )
@@ -603,9 +674,9 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            updated_message = await context.bot.edit_message_text(
+            await context.bot.edit_message_text(
                 chat_id=update.effective_chat.id,
-                message_id=status_message.message_id,
+                message_id=buttons_message_id,
                 text=message_text,
                 reply_markup=reply_markup
             )
@@ -627,12 +698,24 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
             [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Произошла ошибка при проверке статуса оплаты. Попробуйте еще раз.",
-            reply_markup=reply_markup
-        )
+        
+        # Редактируем сообщение с кнопками
+        if 'buttons_message_id' in context.user_data.get('payment', {}):
+            buttons_message_id = context.user_data['payment']['buttons_message_id']
+            await context.bot.edit_message_text(
+                chat_id=update.effective_chat.id,
+                message_id=buttons_message_id,
+                text="Произошла ошибка при проверке статуса оплаты. Попробуйте еще раз.",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        else:
+            # Если ID сообщения с кнопками не найден, отправляем новое
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Произошла ошибка при проверке статуса оплаты. Попробуйте еще раз.",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            
         return PAYMENT
 
 def start_auto_check_payment(context, chat_id, user_data):
@@ -703,18 +786,50 @@ async def cancel_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     else:
         logger.warning(f"job_queue недоступен при отмене платежа для chat_id={update.effective_chat.id}")
     
+    # Удаляем сообщение с QR-кодом, если его ID есть в контексте
+    try:
+        if 'payment' in context.user_data and 'qr_message_id' in context.user_data['payment']:
+            qr_message_id = context.user_data['payment']['qr_message_id']
+            await context.bot.delete_message(
+                chat_id=update.effective_chat.id,
+                message_id=qr_message_id
+            )
+            logger.info(f"Сообщение с QR-кодом {qr_message_id} успешно удалено при отмене платежа")
+    except Exception as e:
+        logger.warning(f"Не удалось удалить сообщение с QR-кодом: {e}")
+    
+    # Проверяем наличие ID сообщения с кнопками в контексте
+    if 'payment' in context.user_data and 'buttons_message_id' in context.user_data['payment']:
+        buttons_message_id = context.user_data['payment']['buttons_message_id']
+        
+        # Отправляем сообщение об отмене, редактируя только сообщение с кнопками
+        keyboard = [
+            [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
+            [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await context.bot.edit_message_text(
+            chat_id=update.effective_chat.id,
+            message_id=buttons_message_id,
+            text=translations.get_message('payment_cancel'),
+            reply_markup=reply_markup
+        )
+    else:
+        # Если не можем найти ID сообщения с кнопками, редактируем текущее сообщение
+        keyboard = [
+            [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
+            [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            translations.get_message('payment_cancel'),
+            reply_markup=reply_markup
+        )
+    
     # Очищаем данные о платеже
     if 'payment' in context.user_data:
         del context.user_data['payment']
     
-    # Отправляем сообщение об отмене
-    keyboard = [
-        [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
-        [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(
-        translations.get_message('payment_cancel'),
-        reply_markup=reply_markup
-    )
     return MENU 
