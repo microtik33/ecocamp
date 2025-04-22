@@ -354,7 +354,7 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
         
         logger.info(f"Автопроверка: статус платежа {payment_status}, сообщение: {payment_message}")
         
-        if payment_status == 'paid':
+        if payment_status == 'accepted':
             # Оплата успешна, обновляем статусы заказов
             orders_sheet = get_orders_sheet()
             all_orders = orders_sheet.get_all_values()
@@ -524,7 +524,7 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
         
         logger.info(f"Статус платежа: {payment_status}, сообщение: {payment_message}")
         
-        if payment_status == 'paid':
+        if payment_status == 'accepted':
             # Оплата успешна
             # Обновляем статусы заказов
             orders_sheet = get_orders_sheet()
