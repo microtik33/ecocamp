@@ -411,7 +411,8 @@ async def update_orders_status():
     """Обновляет статусы заказов после полуночи."""
     try:
         # Получаем все заказы
-        all_orders = get_orders_sheet().get_all_values()
+        orders_sheet = get_orders_sheet()
+        all_orders = orders_sheet.get_all_values()
         today = datetime.now().date()
         
         # Создаем список для пакетного обновления
@@ -469,7 +470,7 @@ async def update_orders_status():
             
             # Выполняем пакетное обновление
             for range_name, values in ranges:
-                get_orders_sheet().update(range_name, values, value_input_option='USER_ENTERED')
+                orders_sheet.update(range_name, values, value_input_option='USER_ENTERED')
         
         return True
     except Exception as e:
@@ -505,7 +506,8 @@ async def update_orders_to_awaiting_payment():
             return True
         
         # Получаем все заказы
-        all_orders = get_orders_sheet().get_all_values()
+        orders_sheet = get_orders_sheet()
+        all_orders = orders_sheet.get_all_values()
         
         # Создаем список для пакетного обновления
         updates = []
@@ -563,7 +565,7 @@ async def update_orders_to_awaiting_payment():
             
             # Выполняем пакетное обновление
             for range_name, values in ranges:
-                get_orders_sheet().update(range_name, values, value_input_option='USER_ENTERED')
+                orders_sheet.update(range_name, values, value_input_option='USER_ENTERED')
             
             logging.info(f"Обновлено {len(updates)} заказов типа {meal_type_to_check} на статус 'Ожидает оплаты'")
         else:
@@ -593,7 +595,8 @@ async def check_orders_awaiting_payment_at_startup():
         current_hour = now.hour
         
         # Получаем все заказы
-        all_orders = get_orders_sheet().get_all_values()
+        orders_sheet = get_orders_sheet()
+        all_orders = orders_sheet.get_all_values()
         
         # Создаем список для пакетного обновления
         updates = []
@@ -662,7 +665,7 @@ async def check_orders_awaiting_payment_at_startup():
             
             # Выполняем пакетное обновление
             for range_name, values in ranges:
-                get_orders_sheet().update(range_name, values, value_input_option='USER_ENTERED')
+                orders_sheet.update(range_name, values, value_input_option='USER_ENTERED')
             
             logging.info(f"Обновлено {len(updates)} заказов на статус 'Ожидает оплаты' при запуске бота")
         else:
