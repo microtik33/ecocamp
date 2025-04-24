@@ -156,7 +156,7 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 # Добавляем ссылку на оплату, если она есть
                 payment_url = context.user_data['payment'].get('payload', '')
                 if payment_url:
-                    message_text += f"Ссылка для оплаты: {payment_url}\n\n"
+                    message_text += f"Также можете оплатить по ссылке: {payment_url}\n\n"
                 
                 message_text += translations.get_message('payment_instructions')
                 
@@ -182,7 +182,7 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 # Сохраняем ID сообщения с кнопками в контексте пользователя
                 buttons_message = await context.bot.send_message(
                     chat_id=update.effective_chat.id,
-                    text="Для управления платежом используйте кнопки ниже:",
+                    text="Если оплата не подтвердилась автоматически, нажмите на кнопку 'Проверить статус оплаты':",
                     reply_markup=reply_markup
                 )
                 
@@ -212,7 +212,7 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 # Добавляем ссылку на оплату, если она есть
                 payment_url = context.user_data['payment'].get('payload', '')
                 if payment_url:
-                    message_text += f"Ссылка для оплаты: {payment_url}\n\n"
+                    message_text += f"Также можете оплатить по ссылке: {payment_url}\n\n"
                 
                 message_text += translations.get_message('payment_instructions')
                 
@@ -233,7 +233,7 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 
                 buttons_message = await context.bot.send_message(
                     chat_id=update.effective_chat.id,
-                    text="Для управления платежом используйте кнопки ниже:",
+                    text="Если оплата не подтвердилась автоматически, нажмите 'Проверить статус оплаты':",
                     reply_markup=reply_markup
                 )
                 
@@ -260,7 +260,7 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Добавляем ссылку на оплату, если она есть
         payment_url = context.user_data['payment'].get('payload', '')
         if payment_url:
-            message_text += f"Ссылка для оплаты: {payment_url}\n\n"
+            message_text += f"Также можете оплатить по ссылке: {payment_url}\n\n"
         
         message_text += translations.get_message('payment_instructions')
         
@@ -281,7 +281,7 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         buttons_message = await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="Для управления платежом используйте кнопки ниже:",
+            text="Если оплата не подтвердилась автоматически, нажмите 'Проверить статус оплаты':",
             reply_markup=reply_markup
         )
         
@@ -518,7 +518,7 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
         reply_markup = InlineKeyboardMarkup(keyboard)
         buttons_message = await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="Для управления платежом используйте кнопки ниже:",
+            text="Если оплата не подтвердилась автоматически, нажмите 'Проверить статус оплаты':",
             reply_markup=reply_markup
         )
         context.user_data['payment']['buttons_message_id'] = buttons_message.message_id

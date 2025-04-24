@@ -98,7 +98,7 @@ BUTTONS = {
     'back_to_menu_list': '⬅️ Назад',
     
     # Кнопки для оплаты через СБП
-    'pay_orders': 'Оплатить',
+    'pay_orders': 'Оплатить через СБП',
     'check_payment': 'Проверить статус оплаты',
     'cancel_payment': 'Отменить оплату',
     'back_to_orders': 'Назад к заказам'
