@@ -8,7 +8,8 @@ from .services.sheets import (
     update_orders_status, 
     force_update_menu_cache,
     force_update_composition_cache,
-    force_update_today_menu_cache
+    force_update_today_menu_cache,
+    update_orders_to_awaiting_payment
 )
 from .services.records import process_daily_orders
 
@@ -119,6 +120,33 @@ async def schedule_daily_tasks():
                 logging.info("Обработка заказов завершена успешно")
             except Exception as e:
                 logging.error(f"Ошибка при обработке заказов: {e}")
+        
+        # Если сейчас 9:00 - обновляем статусы заказов на завтрак
+        elif current_time.hour == 9 and current_time.minute == 0:
+            logging.info("Наступило 9:00, обновляем статусы заказов завтрака")
+            try:
+                await update_orders_to_awaiting_payment()
+                logging.info("Проверка и обновление статусов заказов завтрака выполнены")
+            except Exception as e:
+                logging.error(f"Ошибка при обновлении статусов заказов завтрака: {e}")
+        
+        # Если сейчас 14:00 - обновляем статусы заказов на обед
+        elif current_time.hour == 14 and current_time.minute == 0:
+            logging.info("Наступило 14:00, обновляем статусы заказов обеда")
+            try:
+                await update_orders_to_awaiting_payment()
+                logging.info("Проверка и обновление статусов заказов обеда выполнены")
+            except Exception as e:
+                logging.error(f"Ошибка при обновлении статусов заказов обеда: {e}")
+        
+        # Если сейчас 19:00 - обновляем статусы заказов на ужин
+        elif current_time.hour == 19 and current_time.minute == 0:
+            logging.info("Наступило 19:00, обновляем статусы заказов ужина")
+            try:
+                await update_orders_to_awaiting_payment()
+                logging.info("Проверка и обновление статусов заказов ужина выполнены")
+            except Exception as e:
+                logging.error(f"Ошибка при обновлении статусов заказов ужина: {e}")
         
         # Если сейчас 9:59 - обновляем кэши
         elif current_time.hour == 9 and current_time.minute == 59:

@@ -736,8 +736,8 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
     from orderbot.services.sheets import get_orders_sheet
     orders_sheet = get_orders_sheet()
     all_orders = orders_sheet.get_all_values()
-    # Фильтруем заказы пользователя со статусами "Принят" и "Активен"
-    user_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] in ['Принят', 'Активен']]
+    # Фильтруем заказы пользователя со статусами "Принят", "Активен" и "Ожидает оплаты"
+    user_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] in ['Принят', 'Активен', 'Ожидает оплаты']]
     
     if not user_orders:
         message = escape_markdown_v2(translations.get_message('no_active_orders'))
@@ -751,10 +751,20 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
         else:
             await update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
     else:
-        # Сортируем заказы: сначала "Принят", потом "Активен"
-        user_orders.sort(key=lambda x: (x[2] != 'Принят', x[1]))
+        # Сортируем заказы по приоритету статуса и времени
+        # Приоритет: "Ожидает оплаты", "Принят", "Активен"
+        def order_status_priority(status):
+            if status == 'Ожидает оплаты':
+                return 0
+            elif status == 'Принят':
+                return 1
+            else:  # Активен
+                return 2
+        
+        user_orders.sort(key=lambda x: (order_status_priority(x[2]), x[1]))
         
         # Разделяем заказы по статусам
+        awaiting_payment_orders = [order for order in user_orders if order[2] == 'Ожидает оплаты']
         processing_orders = [order for order in user_orders if order[2] == 'Принят']
         active_orders = [order for order in user_orders if order[2] == 'Активен']
         
@@ -762,8 +772,53 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
         current_message = ""
         total_sum = 0
         
+        # Добавляем заказы, ожидающие оплаты
+        if awaiting_payment_orders:
+            messages.append(escape_markdown_v2("Ваши заказы, ожидающие оплаты:"))
+            for order in awaiting_payment_orders:
+                # Формируем информацию о заказе
+                delivery_date = order[11] if order[11] else None
+                meal_type = order[8]
+                meal_type_with_date = f"{translations.get_meal_type(meal_type)} ({delivery_date})" if delivery_date else translations.get_meal_type(meal_type)
+                
+                # Экранируем специальные символы для Markdown V2
+                escaped_order_id = escape_markdown_v2(order[0])
+                escaped_status = escape_markdown_v2(order[2])
+                escaped_timestamp = escape_markdown_v2(order[1])
+                escaped_room = escape_markdown_v2(order[6])
+                escaped_name = escape_markdown_v2(order[7])
+                escaped_meal_type = escape_markdown_v2(meal_type_with_date)
+                
+                order_info = (
+                    f"💰 Заказ *{escaped_order_id}* \\({escaped_status}\\)\n"
+                    f"🍽 Время: {escaped_meal_type}\n"
+                )
+                
+                # Разбиваем строку с блюдами на отдельные блюда и форматируем каждое
+                dishes = order[9].split(', ')
+                for dish in dishes:
+                    escaped_dish = escape_markdown_v2(dish)
+                    order_info += f"  • {escaped_dish}\n"
+                
+                order_sum = int(float(order[5])) if order[5] else 0
+                total_sum += order_sum
+                escaped_sum = escape_markdown_v2(str(order_sum))
+                order_info += f"💰 Сумма: {escaped_sum} р\\.\n"
+                order_info += translations.get_message('active_orders_separator')
+                
+                # Если текущее сообщение станет слишком длинным, начинаем новое
+                if len(current_message + order_info) > 3000:  # Оставляем запас для доп. текста
+                    messages.append(current_message)
+                    current_message = order_info
+                else:
+                    current_message += order_info
+        
         # Добавляем заказы в обработке
         if processing_orders:
+            if current_message:  # Если есть предыдущие сообщения, добавляем разделитель
+                messages.append(current_message)
+                current_message = ""
+            
             messages.append(escape_markdown_v2("Ваши заказы, переданные повару:"))
             for order in processing_orders:
                 # Формируем информацию о заказе
@@ -935,11 +990,10 @@ async def cancel_order(update: telegram.Update, context: telegram.ext.ContextTyp
         
         for idx, row in enumerate(all_orders):
             if (row[0] == order['order_id'] and  # Проверяем ID заказа
-                row[2] == 'Активен' and          # Проверяем статус
+                row[2] in ['Активен', 'Принят', 'Ожидает оплаты'] and  # Проверяем статус
                 row[3] == user_id):              # Проверяем ID пользователя
                 
-                # Меняем статус заказа на "Отменён" (учитываем, что индексы в таблице начинаются с 1)
-                # Колонка C (индекс 2) содержит статус заказа
+                # Меняем статус заказа на "Отменён"
                 orders_sheet.update_cell(idx + 1, 3, 'Отменён')
                 order_found = True
                 break
@@ -1049,7 +1103,8 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
         
         message += f"📝 Пожелания: {order_info['wishes']}\n"
         message += f"💰 Сумма заказа: {order_info['total_price']} р.\n"
-        message += f"⏰ Заказ оформлен: {order_info['timestamp']}\n\n"
+        message += f"⏰ Заказ оформлен: {order_info['timestamp']}\n"
+        message += f"📊 Статус: {order_info['status']}\n\n"
         message += "Хотите отредактировать этот заказ?"
         
         keyboard = [
@@ -1097,7 +1152,7 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
             
             for idx, row in enumerate(all_orders):
                 if (row[0] == order['order_id'] and  # Проверяем ID заказа
-                    row[2] == 'Активен' and          # Проверяем статус
+                    row[2] in ['Активен', 'Принят', 'Ожидает оплаты'] and  # Проверяем статус
                     row[3] == user_id):              # Проверяем ID пользователя
                     
                     # Меняем статус заказа на "Отменён"
@@ -1276,10 +1331,10 @@ async def show_edit_active_orders(update: telegram.Update, context: telegram.ext
     from orderbot.services.sheets import get_orders_sheet
     orders_sheet = get_orders_sheet()
     all_orders = orders_sheet.get_all_values()
-    # Фильтруем только активные заказы пользователя
-    active_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] == 'Активен']
+    # Фильтруем только активные заказы и заказы, ожидающие оплаты
+    editable_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] in ['Активен', 'Ожидает оплаты']]
     
-    if not active_orders:
+    if not editable_orders:
         message = translations.get_message('no_active_orders')
         keyboard = [
             [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
@@ -1294,14 +1349,19 @@ async def show_edit_active_orders(update: telegram.Update, context: telegram.ext
     
     # Создаем кнопки для каждого активного заказа
     keyboard = []
-    for order in active_orders:
+    for order in editable_orders:
         # Формируем текст кнопки с информацией о заказе
         delivery_date = order[11] if order[11] else None
         meal_type = order[8]
         meal_type_with_date = f"{translations.get_meal_type(meal_type)} ({delivery_date})" if delivery_date else translations.get_meal_type(meal_type)
         
-        button_text = f"Заказ {order[0]} - {meal_type_with_date}"
+        # Добавляем статус заказа в текст кнопки
+        status_text = " (Ожидает оплаты)" if order[2] == 'Ожидает оплаты' else ""
+        button_text = f"Заказ {order[0]} - {meal_type_with_date}{status_text}"
         keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_order:{order[0]}")])
+    
+    # Добавляем кнопку возврата
+    keyboard.append([InlineKeyboardButton(translations.get_button('back'), callback_data="my_orders")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(message, reply_markup=reply_markup)
