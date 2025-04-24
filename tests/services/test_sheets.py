@@ -164,6 +164,211 @@ async def test_update_orders_status_consecutive_rows(mock_orders_sheet: MagicMoc
         value_input_option='USER_ENTERED'
     )
 
+@pytest.mark.asyncio
+async def test_update_orders_to_awaiting_payment_breakfast(mock_orders_sheet: MagicMock):
+    """Тест обновления статусов заказов на 'Ожидает оплаты' для завтрака в 9:00."""
+    # Подготавливаем тестовые данные
+    today = datetime.now().date()
+    today_str = today.strftime("%d.%m.%y")
+    
+    # Создаем тестовые заказы
+    test_orders = [
+        # Заголовок
+        ['ID', 'Дата', 'Статус', 'User ID', 'Username', 'Сумма', 'Комната', 'Имя', 'Тип', 'Блюда', 'Пожелания', 'Дата выдачи'],
+        # Заказ завтрака на сегодня со статусом Принят
+        ['1', '2024-04-04', 'Принят', '1', '@user1', '100', '101', 'User1', 'Завтрак', 'Блюдо1', '-', today_str],
+        # Заказ обеда на сегодня со статусом Принят
+        ['2', '2024-04-04', 'Принят', '2', '@user2', '200', '102', 'User2', 'Обед', 'Блюдо2', '-', today_str],
+        # Заказ ужина на сегодня со статусом Принят
+        ['3', '2024-04-04', 'Принят', '3', '@user3', '300', '103', 'User3', 'Ужин', 'Блюдо3', '-', today_str],
+        # Заказ завтрака на сегодня со статусом Активен (не должен измениться)
+        ['4', '2024-04-04', 'Активен', '4', '@user4', '400', '104', 'User4', 'Завтрак', 'Блюдо4', '-', today_str],
+        # Заказ завтрака на завтра (не должен измениться)
+        ['5', '2024-04-04', 'Принят', '5', '@user5', '500', '105', 'User5', 'Завтрак', 'Блюдо5', '-', (today + timedelta(days=1)).strftime("%d.%m.%y")],
+    ]
+    
+    # Настраиваем мок для get_all_values
+    mock_orders_sheet.get_all_values.return_value = test_orders
+    
+    # Устанавливаем текущее время на 9:00
+    with patch('orderbot.services.sheets.datetime') as mock_dt:
+        mock_dt.now.return_value = datetime.combine(today, datetime.min.time().replace(hour=9))
+        mock_dt.strptime.side_effect = lambda *args, **kw: datetime.strptime(*args, **kw)
+        
+        # Вызываем тестируемую функцию
+        result = await sheets.update_orders_to_awaiting_payment()
+        
+        # Проверяем результат
+        assert result is True
+        
+        # Проверяем, что был выполнен только один вызов update для заказа завтрака на сегодня
+        mock_orders_sheet.update.assert_called_once_with(
+            'C2',  # Только строка с завтраком
+            [['Ожидает оплаты']],  # Новый статус
+            value_input_option='USER_ENTERED'
+        )
+
+@pytest.mark.asyncio
+async def test_update_orders_to_awaiting_payment_lunch(mock_orders_sheet: MagicMock):
+    """Тест обновления статусов заказов на 'Ожидает оплаты' для обеда в 14:00."""
+    # Подготавливаем тестовые данные
+    today = datetime.now().date()
+    today_str = today.strftime("%d.%m.%y")
+    
+    # Создаем тестовые заказы
+    test_orders = [
+        # Заголовок
+        ['ID', 'Дата', 'Статус', 'User ID', 'Username', 'Сумма', 'Комната', 'Имя', 'Тип', 'Блюда', 'Пожелания', 'Дата выдачи'],
+        # Заказ завтрака на сегодня со статусом Принят
+        ['1', '2024-04-04', 'Принят', '1', '@user1', '100', '101', 'User1', 'Завтрак', 'Блюдо1', '-', today_str],
+        # Заказ обеда на сегодня со статусом Принят
+        ['2', '2024-04-04', 'Принят', '2', '@user2', '200', '102', 'User2', 'Обед', 'Блюдо2', '-', today_str],
+        # Заказ ужина на сегодня со статусом Принят
+        ['3', '2024-04-04', 'Принят', '3', '@user3', '300', '103', 'User3', 'Ужин', 'Блюдо3', '-', today_str],
+        # Заказ обеда на сегодня со статусом Активен (не должен измениться)
+        ['4', '2024-04-04', 'Активен', '4', '@user4', '400', '104', 'User4', 'Обед', 'Блюдо4', '-', today_str],
+        # Заказ обеда на завтра (не должен измениться)
+        ['5', '2024-04-04', 'Принят', '5', '@user5', '500', '105', 'User5', 'Обед', 'Блюдо5', '-', (today + timedelta(days=1)).strftime("%d.%m.%y")],
+    ]
+    
+    # Настраиваем мок для get_all_values
+    mock_orders_sheet.get_all_values.return_value = test_orders
+    
+    # Устанавливаем текущее время на 14:00
+    with patch('orderbot.services.sheets.datetime') as mock_dt:
+        mock_dt.now.return_value = datetime.combine(today, datetime.min.time().replace(hour=14))
+        mock_dt.strptime.side_effect = lambda *args, **kw: datetime.strptime(*args, **kw)
+        
+        # Вызываем тестируемую функцию
+        result = await sheets.update_orders_to_awaiting_payment()
+        
+        # Проверяем результат
+        assert result is True
+        
+        # Проверяем, что был выполнен только один вызов update для заказа обеда на сегодня
+        mock_orders_sheet.update.assert_called_once_with(
+            'C3',  # Только строка с обедом
+            [['Ожидает оплаты']],  # Новый статус
+            value_input_option='USER_ENTERED'
+        )
+
+@pytest.mark.asyncio
+async def test_update_orders_to_awaiting_payment_dinner(mock_orders_sheet: MagicMock):
+    """Тест обновления статусов заказов на 'Ожидает оплаты' для ужина в 19:00."""
+    # Подготавливаем тестовые данные
+    today = datetime.now().date()
+    today_str = today.strftime("%d.%m.%y")
+    
+    # Создаем тестовые заказы
+    test_orders = [
+        # Заголовок
+        ['ID', 'Дата', 'Статус', 'User ID', 'Username', 'Сумма', 'Комната', 'Имя', 'Тип', 'Блюда', 'Пожелания', 'Дата выдачи'],
+        # Заказ завтрака на сегодня со статусом Принят
+        ['1', '2024-04-04', 'Принят', '1', '@user1', '100', '101', 'User1', 'Завтрак', 'Блюдо1', '-', today_str],
+        # Заказ обеда на сегодня со статусом Принят
+        ['2', '2024-04-04', 'Принят', '2', '@user2', '200', '102', 'User2', 'Обед', 'Блюдо2', '-', today_str],
+        # Заказ ужина на сегодня со статусом Принят
+        ['3', '2024-04-04', 'Принят', '3', '@user3', '300', '103', 'User3', 'Ужин', 'Блюдо3', '-', today_str],
+        # Заказ ужина на сегодня со статусом Активен (не должен измениться)
+        ['4', '2024-04-04', 'Активен', '4', '@user4', '400', '104', 'User4', 'Ужин', 'Блюдо4', '-', today_str],
+        # Заказ ужина на завтра (не должен измениться)
+        ['5', '2024-04-04', 'Принят', '5', '@user5', '500', '105', 'User5', 'Ужин', 'Блюдо5', '-', (today + timedelta(days=1)).strftime("%d.%m.%y")],
+    ]
+    
+    # Настраиваем мок для get_all_values
+    mock_orders_sheet.get_all_values.return_value = test_orders
+    
+    # Устанавливаем текущее время на 19:00
+    with patch('orderbot.services.sheets.datetime') as mock_dt:
+        mock_dt.now.return_value = datetime.combine(today, datetime.min.time().replace(hour=19))
+        mock_dt.strptime.side_effect = lambda *args, **kw: datetime.strptime(*args, **kw)
+        
+        # Вызываем тестируемую функцию
+        result = await sheets.update_orders_to_awaiting_payment()
+        
+        # Проверяем результат
+        assert result is True
+        
+        # Проверяем, что был выполнен только один вызов update для заказа ужина на сегодня
+        mock_orders_sheet.update.assert_called_once_with(
+            'C4',  # Только строка с ужином
+            [['Ожидает оплаты']],  # Новый статус
+            value_input_option='USER_ENTERED'
+        )
+
+@pytest.mark.asyncio
+async def test_update_orders_to_awaiting_payment_wrong_time(mock_orders_sheet: MagicMock):
+    """Тест, что функция не обновляет статусы заказов в неположенное время."""
+    # Подготавливаем тестовые данные
+    today = datetime.now().date()
+    today_str = today.strftime("%d.%m.%y")
+    
+    # Создаем тестовые заказы
+    test_orders = [
+        # Заголовок
+        ['ID', 'Дата', 'Статус', 'User ID', 'Username', 'Сумма', 'Комната', 'Имя', 'Тип', 'Блюда', 'Пожелания', 'Дата выдачи'],
+        # Заказы на сегодня со статусом Принят
+        ['1', '2024-04-04', 'Принят', '1', '@user1', '100', '101', 'User1', 'Завтрак', 'Блюдо1', '-', today_str],
+        ['2', '2024-04-04', 'Принят', '2', '@user2', '200', '102', 'User2', 'Обед', 'Блюдо2', '-', today_str],
+        ['3', '2024-04-04', 'Принят', '3', '@user3', '300', '103', 'User3', 'Ужин', 'Блюдо3', '-', today_str],
+    ]
+    
+    # Настраиваем мок для get_all_values
+    mock_orders_sheet.get_all_values.return_value = test_orders
+    
+    # Устанавливаем текущее время на 12:00 (не соответствует времени обновления)
+    with patch('orderbot.services.sheets.datetime') as mock_dt:
+        mock_dt.now.return_value = datetime.combine(today, datetime.min.time().replace(hour=12))
+        
+        # Вызываем тестируемую функцию
+        result = await sheets.update_orders_to_awaiting_payment()
+        
+        # Проверяем результат
+        assert result is True
+        
+        # Проверяем, что update не был вызван
+        mock_orders_sheet.update.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_update_orders_to_awaiting_payment_multiple_orders(mock_orders_sheet: MagicMock):
+    """Тест обновления статусов для нескольких заказов одного типа одновременно."""
+    # Подготавливаем тестовые данные
+    today = datetime.now().date()
+    today_str = today.strftime("%d.%m.%y")
+    
+    # Создаем тестовые заказы
+    test_orders = [
+        # Заголовок
+        ['ID', 'Дата', 'Статус', 'User ID', 'Username', 'Сумма', 'Комната', 'Имя', 'Тип', 'Блюда', 'Пожелания', 'Дата выдачи'],
+        # Несколько заказов завтрака на сегодня со статусом Принят
+        ['1', '2024-04-04', 'Принят', '1', '@user1', '100', '101', 'User1', 'Завтрак', 'Блюдо1', '-', today_str],
+        ['2', '2024-04-04', 'Принят', '2', '@user2', '200', '102', 'User2', 'Завтрак', 'Блюдо2', '-', today_str],
+        ['3', '2024-04-04', 'Принят', '3', '@user3', '300', '103', 'User3', 'Завтрак', 'Блюдо3', '-', today_str],
+        # Заказ другого типа
+        ['4', '2024-04-04', 'Принят', '4', '@user4', '400', '104', 'User4', 'Обед', 'Блюдо4', '-', today_str],
+    ]
+    
+    # Настраиваем мок для get_all_values
+    mock_orders_sheet.get_all_values.return_value = test_orders
+    
+    # Устанавливаем текущее время на 9:00
+    with patch('orderbot.services.sheets.datetime') as mock_dt:
+        mock_dt.now.return_value = datetime.combine(today, datetime.min.time().replace(hour=9))
+        mock_dt.strptime.side_effect = lambda *args, **kw: datetime.strptime(*args, **kw)
+        
+        # Вызываем тестируемую функцию
+        result = await sheets.update_orders_to_awaiting_payment()
+        
+        # Проверяем результат
+        assert result is True
+        
+        # Проверяем, что был выполнен один вызов update для всех трех заказов завтрака
+        mock_orders_sheet.update.assert_called_once_with(
+            'C2:C4',  # Диапазон для трех последовательных заказов завтрака
+            [['Ожидает оплаты'], ['Ожидает оплаты'], ['Ожидает оплаты']],  # Новые статусы
+            value_input_option='USER_ENTERED'
+        )
+
 def test_get_orders_sheet(mock_orders_sheet):
     """Тест получения листа заказов."""
     from orderbot.services.sheets import get_orders_sheet
@@ -198,4 +403,41 @@ def test_get_menu_sheet(mock_menu_sheet):
     """Тест получения листа меню."""
     from orderbot.services.sheets import get_menu_sheet
     sheet = get_menu_sheet()
-    assert sheet == mock_menu_sheet 
+    assert sheet == mock_menu_sheet
+
+@pytest.mark.asyncio
+async def test_get_user_orders_with_all_statuses(mock_orders_sheet: MagicMock):
+    """Тест получения заказов пользователя со всеми доступными статусами."""
+    # Создаем тестовые заказы
+    test_orders = [
+        # Заголовок
+        ['ID', 'Дата', 'Статус', 'User ID', 'Username', 'Сумма', 'Комната', 'Имя', 'Тип', 'Блюда', 'Пожелания', 'Дата выдачи'],
+        # Заказы пользователя с разными статусами
+        ['1', '2024-04-04', 'Активен', '123', '@user1', '100', '101', 'User1', 'breakfast', 'Блюдо1', '-', '05.04.24'],
+        ['2', '2024-04-04', 'Принят', '123', '@user1', '200', '102', 'User1', 'lunch', 'Блюдо2', '-', '05.04.24'],
+        ['3', '2024-04-04', 'Ожидает оплаты', '123', '@user1', '300', '103', 'User1', 'dinner', 'Блюдо3', '-', '05.04.24'],
+        ['4', '2024-04-04', 'Отменён', '123', '@user1', '400', '104', 'User1', 'breakfast', 'Блюдо4', '-', '05.04.24'],
+        # Заказы другого пользователя
+        ['5', '2024-04-04', 'Активен', '456', '@user2', '500', '105', 'User2', 'breakfast', 'Блюдо5', '-', '05.04.24'],
+    ]
+    
+    # Настраиваем мок для get_all_values
+    mock_orders_sheet.get_all_values.return_value = test_orders
+    
+    # Вызываем тестируемую функцию
+    from orderbot.services.sheets import get_user_orders
+    result = await get_user_orders('123')
+    
+    # Проверяем результат
+    assert len(result) == 3  # Должны быть возвращены только заказы со статусами 'Активен', 'Принят' и 'Ожидает оплаты'
+    
+    # Проверяем статусы возвращенных заказов
+    statuses = [order[2] for order in result]
+    assert 'Активен' in statuses
+    assert 'Принят' in statuses
+    assert 'Ожидает оплаты' in statuses
+    assert 'Отменён' not in statuses  # Отмененные заказы не должны возвращаться
+    
+    # Проверяем, что вернулись только заказы пользователя с ID '123'
+    user_ids = [order[3] for order in result]
+    assert all(user_id == '123' for user_id in user_ids) 

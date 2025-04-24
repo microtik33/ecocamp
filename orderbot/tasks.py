@@ -9,7 +9,8 @@ from .services.sheets import (
     force_update_menu_cache,
     force_update_composition_cache,
     force_update_today_menu_cache,
-    update_orders_to_awaiting_payment
+    update_orders_to_awaiting_payment,
+    check_orders_awaiting_payment_at_startup
 )
 from .services.records import process_daily_orders
 
@@ -24,6 +25,10 @@ async def check_orders_status():
     try:
         await update_orders_status()
         logging.info("Статусы заказов проверены при запуске бота")
+        
+        # После обновления статусов с "Активен" на "Принят", проверяем, нужно ли обновить до "Ожидает оплаты"
+        await check_orders_awaiting_payment_at_startup()
+        logging.info("Проверены заказы, требующие обновления до 'Ожидает оплаты' при запуске")
     except Exception as e:
         logging.error(f"Ошибка при проверке статусов заказов при запуске: {e}")
 

@@ -574,6 +574,105 @@ async def update_orders_to_awaiting_payment():
         logging.error(f"Ошибка при обновлении статусов заказов на 'Ожидает оплаты': {e}")
         return False
 
+async def check_orders_awaiting_payment_at_startup():
+    """Проверяет и обновляет статусы заказов, требующих смены статуса на 'Ожидает оплаты' при запуске бота.
+    
+    Функция вызывается после обновления статусов с 'Активен' на 'Принят'.
+    Она проверяет заказы со статусом 'Принят' и если текущее время уже прошло время 
+    изменения статуса для данного типа еды в день выдачи, изменяет статус на 'Ожидает оплаты'.
+    
+    Правила смены статуса:
+    - Заказы завтрака: после 9:00
+    - Заказы обеда: после 14:00
+    - Заказы ужина: после 19:00
+    """
+    try:
+        # Получаем текущую дату и время
+        now = datetime.now()
+        today = now.date()
+        current_hour = now.hour
+        
+        # Получаем все заказы
+        all_orders = get_orders_sheet().get_all_values()
+        
+        # Создаем список для пакетного обновления
+        updates = []
+        
+        # Словарь для определения, какие типы еды нужно обновить в зависимости от времени
+        meal_types_to_check = {
+            "Завтрак": current_hour >= 9,
+            "Обед": current_hour >= 14,
+            "Ужин": current_hour >= 19
+        }
+        
+        # Проходим по всем заказам и проверяем, нужно ли обновлять их статус
+        for idx, order in enumerate(all_orders[1:], start=2):
+            # Проверяем, что заказ имеет статус "Принят"
+            if order[2] == 'Принят':
+                meal_type = order[8]  # Тип еды в 9-м столбце
+                
+                # Получаем дату выдачи заказа
+                delivery_date_str = order[11]  # Дата выдачи в последнем столбце
+                if delivery_date_str:  # Проверяем, что дата выдачи указана
+                    try:
+                        # Парсим дату в формате DD.MM.YY
+                        delivery_date = datetime.strptime(delivery_date_str, "%d.%m.%y").date()
+                        
+                        # Если заказ на текущий день и время уже прошло порог для этого типа еды,
+                        # добавляем в список для обновления
+                        if delivery_date == today and meal_type in meal_types_to_check and meal_types_to_check[meal_type]:
+                            updates.append(idx)
+                            logging.info(f"Заказ {order[0]} ({meal_type}) будет обновлен до 'Ожидает оплаты' при запуске")
+                    except ValueError:
+                        logging.error(f"Ошибка при парсинге даты выдачи заказа {order[0]}: {delivery_date_str}")
+                        continue
+        
+        # Если есть заказы для обновления, выполняем пакетное обновление
+        if updates:
+            # Сортируем индексы строк
+            updates.sort()
+            
+            # Группируем последовательные индексы
+            ranges = []
+            current_range = []
+            
+            for idx in updates:
+                if not current_range or idx == current_range[-1] + 1:
+                    current_range.append(idx)
+                else:
+                    # Если последовательность прервалась, сохраняем текущий диапазон
+                    if len(current_range) == 1:
+                        ranges.append((f'C{current_range[0]}', [['Ожидает оплаты']]))
+                    else:
+                        ranges.append((
+                            f'C{current_range[0]}:C{current_range[-1]}',
+                            [['Ожидает оплаты']] * len(current_range)
+                        ))
+                    current_range = [idx]
+            
+            # Добавляем последний диапазон
+            if current_range:
+                if len(current_range) == 1:
+                    ranges.append((f'C{current_range[0]}', [['Ожидает оплаты']]))
+                else:
+                    ranges.append((
+                        f'C{current_range[0]}:C{current_range[-1]}',
+                        [['Ожидает оплаты']] * len(current_range)
+                    ))
+            
+            # Выполняем пакетное обновление
+            for range_name, values in ranges:
+                get_orders_sheet().update(range_name, values, value_input_option='USER_ENTERED')
+            
+            logging.info(f"Обновлено {len(updates)} заказов на статус 'Ожидает оплаты' при запуске бота")
+        else:
+            logging.info("Нет заказов, требующих обновления статуса до 'Ожидает оплаты' при запуске")
+        
+        return True
+    except Exception as e:
+        logging.error(f"Ошибка при проверке заказов на смену статуса до 'Ожидает оплаты' при запуске: {e}")
+        return False
+
 def get_credentials():
     # Получаем закодированные credentials из переменной окружения
     encoded_credentials = os.getenv('GOOGLE_CREDENTIALS_BASE64')

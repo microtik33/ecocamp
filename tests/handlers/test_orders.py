@@ -323,7 +323,9 @@ async def test_show_user_orders(mock_update: Update, mock_context: MagicMock) ->
     # Настраиваем мок для заказов
     mock_orders = [
         ['ID', 'Время', 'Статус', 'User ID', 'Username', 'Сумма', 'Комната', 'Имя', 'Тип', 'Блюда', 'Пожелания', 'Дата'],
-        ['1', '2024-03-14', 'Активен', '1', '@test', '100', '101', 'Test User', 'breakfast', 'Каша', '-', '2024-03-15']
+        ['1', '2024-03-14', 'Активен', '1', '@test', '100', '101', 'Test User', 'breakfast', 'Каша', '-', '2024-03-15'],
+        ['2', '2024-03-14', 'Принят', '1', '@test', '200', '102', 'Test User', 'lunch', 'Суп', '-', '2024-03-15'],
+        ['3', '2024-03-14', 'Ожидает оплаты', '1', '@test', '300', '103', 'Test User', 'dinner', 'Рыба', '-', '2024-03-15']
     ]
     
     with patch('orderbot.services.sheets.get_orders_sheet') as mock_get_sheet:
@@ -331,23 +333,42 @@ async def test_show_user_orders(mock_update: Update, mock_context: MagicMock) ->
         mock_sheet.get_all_values.return_value = mock_orders
         mock_get_sheet.return_value = mock_sheet
         
-        # Настраиваем мок для translations
-        with patch('orderbot.translations.get_message') as mock_get_message:
-            mock_get_message.side_effect = lambda key, **kwargs: {
-                'active_orders_separator': '\n---\n',
-                'total_sum': 'Общая сумма: {sum} р.',
-                'what_next': 'Что дальше?'
-            }.get(key, 'Ваши активные заказы:')
-            
-            with patch('orderbot.translations.get_meal_type', return_value='Завтрак'):
-                result = await show_user_orders(mock_update, mock_context)
+        # Мокаем функцию escape_markdown_v2
+        with patch('orderbot.handlers.order.escape_markdown_v2', side_effect=lambda x: x):
+            # Настраиваем мок для translations
+            with patch('orderbot.translations.get_message') as mock_get_message:
+                mock_get_message.side_effect = lambda key, **kwargs: {
+                    'active_orders_separator': '\n---\n',
+                    'total_sum': 'Общая сумма: {sum} р.',
+                    'what_next': 'Что дальше?',
+                    'orders_display_error': 'Ошибка отображения заказов'
+                }.get(key, 'Ваши активные заказы:')
                 
-                # Проверяем вызовы
-                mock_update.message.reply_text.assert_called()
-                args = mock_update.message.reply_text.call_args
-                assert args is not None
-                assert "Ваши активные заказы:" in args[0][0]
-                assert result == MENU
+                with patch('orderbot.translations.get_meal_type', return_value='Завтрак'):
+                    result = await show_user_orders(mock_update, mock_context)
+                    
+                    # Проверяем вызовы
+                    mock_update.message.reply_text.assert_called()
+                    args = mock_update.message.reply_text.call_args
+                    assert args is not None
+                    
+                    # Проверяем, что разные статусы заказов отображаются
+                    text = args[0][0]
+                    assert "Ваши заказы, ожидающие оплаты:" in text
+                    assert "Ожидает оплаты" in text
+                    assert "Принят" in text
+                    assert "Активен" in text
+                    
+                    # Проверяем, что заказы отсортированы по приоритету
+                    # Сначала должны идти заказы со статусом "Ожидает оплаты"
+                    payment_index = text.find("Ожидает оплаты")
+                    accepted_index = text.find("Принят")
+                    active_index = text.find("Активен")
+                    
+                    assert payment_index < accepted_index
+                    assert accepted_index < active_index
+                    
+                    assert result == MENU
 
 @pytest.mark.asyncio
 async def test_handle_question(mock_update: Update, mock_context: MagicMock) -> None:
@@ -400,19 +421,58 @@ async def test_show_edit_active_orders(mock_update: Update, mock_context: MagicM
     mock_update.callback_query = AsyncMock()
     mock_update.callback_query.answer = AsyncMock()
     mock_update.callback_query.edit_message_text = AsyncMock()
-    mock_update.callback_query.data = 'edit_orders'
+    mock_update.callback_query.data = 'edit_active_orders'
     mock_update.callback_query.from_user = MagicMock()
     mock_update.callback_query.from_user.id = 1
 
-    # Настраиваем мок для translations
-    with patch('orderbot.translations.get_message', return_value='Выберите заказ для редактирования'), \
-         patch('orderbot.translations.get_button', side_effect=lambda x: x):
+    # Создаем тестовые заказы с разными статусами
+    mock_orders = [
+        ['ID', 'Время', 'Статус', 'User ID', 'Username', 'Сумма', 'Комната', 'Имя', 'Тип', 'Блюда', 'Пожелания', 'Дата'],
+        ['1', '2024-03-14', 'Активен', '1', '@test', '100', '101', 'Test User', 'breakfast', 'Каша', '-', '2024-03-15'],
+        ['2', '2024-03-14', 'Ожидает оплаты', '1', '@test', '200', '102', 'Test User', 'lunch', 'Суп', '-', '2024-03-15'],
+        ['3', '2024-03-14', 'Принят', '1', '@test', '300', '103', 'Test User', 'dinner', 'Рыба', '-', '2024-03-15']
+    ]
 
-        result = await show_edit_active_orders(mock_update, mock_context)
+    # Настраиваем мок для orders_sheet
+    with patch('orderbot.services.sheets.get_orders_sheet') as mock_get_sheet:
+        mock_sheet = MagicMock()
+        mock_sheet.get_all_values.return_value = mock_orders
+        mock_get_sheet.return_value = mock_sheet
         
-        # Проверяем вызовы
-        mock_update.callback_query.answer.assert_awaited_once()
-        mock_update.callback_query.edit_message_text.assert_awaited_once()
+        # Настраиваем мок для translations
+        with patch('orderbot.translations.get_message', return_value='Выберите заказ для редактирования'), \
+            patch('orderbot.translations.get_button', side_effect=lambda x: x), \
+            patch('orderbot.translations.get_meal_type', return_value='Завтрак'):
+
+            result = await show_edit_active_orders(mock_update, mock_context)
+            
+            # Проверяем вызовы
+            mock_update.callback_query.answer.assert_awaited_once()
+            mock_update.callback_query.edit_message_text.assert_awaited_once()
+            
+            # Проверяем, что функция передала правильные аргументы
+            call_args = mock_update.callback_query.edit_message_text.call_args
+            assert call_args is not None
+            
+            # Выводим сообщение для проверки
+            message = call_args[0][0]
+            reply_markup = call_args[1]['reply_markup']
+            
+            # Проверяем, что клавиатура содержит кнопки для обоих типов заказов
+            keyboard_buttons = reply_markup.inline_keyboard
+            assert len(keyboard_buttons) >= 3  # Минимум 3 заказа (активен, ожидает оплаты и кнопка возврата)
+            
+            # Проверяем, что в кнопках есть заказы со статусом "Активен" и "Ожидает оплаты"
+            button_texts = [btn[0].text for btn in keyboard_buttons]
+            has_active = any('Заказ 1' in text for text in button_texts)
+            has_awaiting_payment = any('Заказ 2' in text and 'Ожидает оплаты' in text for text in button_texts)
+            has_back_button = any('back' in text for text in button_texts)
+            
+            assert has_active, "В клавиатуре должна быть кнопка для активного заказа"
+            assert has_awaiting_payment, "В клавиатуре должна быть кнопка для заказа в статусе 'Ожидает оплаты'"
+            assert has_back_button, "В клавиатуре должна быть кнопка возврата"
+            
+            assert result == MENU
 
 @pytest.mark.asyncio
 async def test_start_new_order(mock_update: Update, mock_context: MagicMock) -> None:
@@ -643,3 +703,111 @@ async def test_handle_order_update_success(
     # Проверяем результат
     assert result is not None
     assert mock_context.user_data.get('editing') is True 
+
+@pytest.mark.asyncio
+async def test_handle_order_update_awaiting_payment(mock_update: Update, mock_context: MagicMock) -> None:
+    """Тест обработки обновления заказа в статусе 'Ожидает оплаты'."""
+    # Подготовка данных
+    order_id = "123"
+    mock_update.callback_query = AsyncMock()
+    mock_update.callback_query.answer = AsyncMock()
+    mock_update.callback_query.edit_message_text = AsyncMock()
+    mock_update.callback_query.data = f'edit_order:{order_id}'
+    mock_update.callback_query.from_user = MagicMock()
+    mock_update.callback_query.from_user.id = 1
+    
+    # Создаем тестовый заказ со статусом "Ожидает оплаты"
+    mock_orders = [
+        ['ID', 'Время', 'Статус', 'User ID', 'Username', 'Сумма', 'Комната', 'Имя', 'Тип', 'Блюда', 'Пожелания', 'Дата'],
+        ['123', '2024-03-14', 'Ожидает оплаты', '1', '@test', '100', '101', 'Test User', 'breakfast', 'Каша', '-', '2024-03-15']
+    ]
+    
+    # Настраиваем мок для sheets.get_orders_sheet
+    with patch('orderbot.services.sheets.get_orders_sheet') as mock_get_sheet:
+        mock_sheet = MagicMock()
+        mock_sheet.get_all_values.return_value = mock_orders
+        mock_get_sheet.return_value = mock_sheet
+        
+        # Настраиваем мок для translations
+        with patch('orderbot.handlers.order.translations.get_message') as mock_get_message, \
+             patch('orderbot.handlers.order.translations.get_button') as mock_get_button, \
+             patch('orderbot.handlers.order.translations.get_meal_type', return_value='Завтрак'):
+            
+            mock_get_message.return_value = 'Сообщение'
+            mock_get_button.side_effect = lambda x: x
+            
+            # Вызываем тестируемую функцию
+            result = await handle_order_update(mock_update, mock_context)
+            
+            # Проверяем, что заказ был загружен в контекст
+            assert 'order' in mock_context.user_data
+            assert 'editing' in mock_context.user_data
+            assert mock_context.user_data['editing'] is True
+            assert mock_context.user_data['order'].get('status') == 'Ожидает оплаты'
+            
+            # Проверяем, что сообщение было отправлено
+            mock_update.callback_query.edit_message_text.assert_awaited_once()
+            call_args = mock_update.callback_query.edit_message_text.call_args
+            text = call_args[0][0]
+            
+            # Проверяем, что статус заказа отображается
+            assert 'Статус: Ожидает оплаты' in text
+
+@pytest.mark.asyncio
+async def test_cancel_order_awaiting_payment(mock_update: Update, mock_context: MagicMock) -> None:
+    """Тест отмены заказа в статусе 'Ожидает оплаты'."""
+    # Подготовка данных
+    mock_update.callback_query = AsyncMock()
+    mock_update.callback_query.answer = AsyncMock()
+    mock_update.callback_query.edit_message_text = AsyncMock()
+    mock_update.callback_query.data = 'cancel_order'
+    mock_update.callback_query.from_user = MagicMock()
+    mock_update.callback_query.from_user.id = 1
+    
+    # Создаем тестовый заказ в контексте
+    mock_context.user_data = {
+        'order': {
+            'order_id': '123',
+            'status': 'Ожидает оплаты',
+            'user_id': '1'
+        }
+    }
+    
+    # Создаем тестовые заказы в таблице
+    mock_orders = [
+        ['ID', 'Время', 'Статус', 'User ID', 'Username', 'Сумма', 'Комната', 'Имя', 'Тип', 'Блюда', 'Пожелания', 'Дата'],
+        ['123', '2024-03-14', 'Ожидает оплаты', '1', '@test', '100', '101', 'Test User', 'breakfast', 'Каша', '-', '2024-03-15']
+    ]
+    
+    # Настраиваем мок для sheets.get_orders_sheet и update_user_stats
+    with patch('orderbot.services.sheets.get_orders_sheet') as mock_get_sheet, \
+         patch('orderbot.handlers.order.update_user_stats') as mock_update_stats:
+        
+        mock_sheet = MagicMock()
+        mock_sheet.get_all_values.return_value = mock_orders
+        mock_sheet.update_cell.return_value = None
+        mock_get_sheet.return_value = mock_sheet
+        
+        mock_update_stats.return_value = True
+        
+        # Настраиваем мок для translations
+        with patch('orderbot.handlers.order.translations.get_message') as mock_get_message, \
+             patch('orderbot.handlers.order.translations.get_button') as mock_get_button:
+            
+            mock_get_message.return_value = 'Заказ отменен'
+            mock_get_button.side_effect = lambda x: x
+            
+            # Вызываем тестируемую функцию
+            result = await handle_order_update(mock_update, mock_context)
+            
+            # Проверяем, что статус заказа был изменен на "Отменён"
+            mock_sheet.update_cell.assert_called_once_with(2, 3, 'Отменён')
+            
+            # Проверяем, что статистика пользователя была обновлена
+            mock_update_stats.assert_awaited_once_with('1')
+            
+            # Проверяем, что данные в контексте были очищены
+            assert len(mock_context.user_data) == 0
+            
+            # Проверяем, что было отправлено сообщение
+            mock_update.callback_query.edit_message_text.assert_awaited_once() 
