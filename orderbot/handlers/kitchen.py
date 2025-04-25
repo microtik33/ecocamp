@@ -160,10 +160,15 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
             
             # Проверяем статус заказа
             is_accepted = order_found[2] == 'Принят'
+            is_awaiting_payment = order_found[2] == 'Ожидает оплаты'
             is_cancelled = order_found[2] == 'Отменён'
             
-            # Добавляем красный эмодзи для отмененных заказов
-            status_emoji = "🔴" if is_cancelled else ""
+            # Добавляем эмодзи для разных статусов заказов
+            status_emoji = ""
+            if is_cancelled:
+                status_emoji = "🔴"
+            elif is_awaiting_payment:
+                status_emoji = "💰"
             
             # Формируем сообщение с информацией о заказе в новом формате с эмодзи
             message = f"🔢 Заказ №*{order_found[0]}*\n\n"
@@ -192,8 +197,8 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
             # Добавляем информацию, относится ли заказ к текущей сводке
             if not is_today_order:
                 additional_info += "\n\n⚠️ Этот заказ НЕ на сегодня, и не включен в текущую сводку."
-            elif not is_accepted:
-                additional_info += "\n\n⚠️ Этот заказ НЕ имеет статус 'Принят', и не включен в текущую сводку."
+            elif not (is_accepted or is_awaiting_payment):
+                additional_info += "\n\n⚠️ Этот заказ НЕ имеет статус 'Принят' или 'Ожидает оплаты', и не включен в текущую сводку."
             
             # Максимальная длина сообщения в Telegram
             MAX_MESSAGE_LENGTH = 4000
@@ -285,10 +290,10 @@ async def find_orders_by_room(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Получаем текущую дату
         today = datetime.now().date()
         
-        # Фильтруем заказы: только те, что на сегодня и со статусом "Принят"
+        # Фильтруем заказы: только те, что на сегодня и со статусом "Принят" или "Ожидает оплаты"
         room_orders = []
         for order in all_orders[1:]:
-            if order[6] == room_number and order[2] == 'Принят' and order[11]:
+            if order[6] == room_number and (order[2] == 'Принят' or order[2] == 'Ожидает оплаты') and order[11]:
                 try:
                     delivery_date = datetime.strptime(order[11], "%d.%m.%y").date()
                     if delivery_date == today:
@@ -310,8 +315,11 @@ async def find_orders_by_room(update: Update, context: ContextTypes.DEFAULT_TYPE
             
             # Формируем сообщения с заказами в новом формате
             for order in room_orders:
+                # Добавляем отметку для заказов в статусе "Ожидает оплаты"
+                status_mark = "💰 " if order[2] == 'Ожидает оплаты' else ""
+                
                 # Изменяем порядок отображения информации о заказе
-                order_text = f"🔢 Заказ №*{order[0]}*\n"
+                order_text = f"{status_mark}🔢 Заказ №*{order[0]}*\n"
                 order_text += f"👤 Имя: *{order[7]}*\n"
                 order_text += f"🍽 Время: *{translations.get_meal_type(order[8])}*\n"
                 

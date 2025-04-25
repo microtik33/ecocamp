@@ -194,7 +194,7 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
         tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d.%m")
         
         # Формируем сообщение с меню
-        message = f"🍽️ Меню на {tomorrow}:\n\n"
+        message = f"🍽️ Меню на {tomorrow}:\n"
         
         # Функция для добавления блюд определенного типа в сообщение
         def add_dishes_for_meal_type(meal_type):
