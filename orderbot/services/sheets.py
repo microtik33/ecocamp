@@ -580,13 +580,12 @@ async def check_orders_awaiting_payment_at_startup():
     """Проверяет и обновляет статусы заказов, требующих смены статуса на 'Ожидает оплаты' при запуске бота.
     
     Функция вызывается после обновления статусов с 'Активен' на 'Принят'.
-    Она проверяет заказы со статусом 'Принят' и если текущее время уже прошло время 
-    изменения статуса для данного типа еды в день выдачи, изменяет статус на 'Ожидает оплаты'.
-    
-    Правила смены статуса:
-    - Заказы завтрака: после 9:00
-    - Заказы обеда: после 14:00
-    - Заказы ужина: после 19:00
+    Она проверяет заказы со статусом 'Принят' и:
+    1. Для заказов прошлых дней (до сегодня) - меняет статус на 'Ожидает оплаты' без дополнительных проверок
+    2. Для заказов сегодняшнего дня - проверяет тип еды и текущее время:
+       - Заказы завтрака: после 9:00
+       - Заказы обеда: после 14:00
+       - Заказы ужина: после 19:00
     """
     try:
         # Получаем текущую дату и время
@@ -632,16 +631,20 @@ async def check_orders_awaiting_payment_at_startup():
                         
                         # Проверяем условия
                         is_today = delivery_date == today
+                        is_past_day = delivery_date < today
                         is_valid_meal_type = meal_type in meal_types_to_check
                         is_time_passed = is_valid_meal_type and meal_types_to_check[meal_type]
                         
-                        logging.info(f"Условия для заказа {order[0]}: is_today={is_today}, is_valid_meal_type={is_valid_meal_type}, is_time_passed={is_time_passed}")
+                        logging.info(f"Условия для заказа {order[0]}: is_today={is_today}, is_past_day={is_past_day}, is_valid_meal_type={is_valid_meal_type}, is_time_passed={is_time_passed}")
                         
-                        # Если заказ на текущий день и время уже прошло порог для этого типа еды,
-                        # добавляем в список для обновления
-                        if is_today and is_valid_meal_type and is_time_passed:
+                        # Если заказ на прошлый день - безусловно обновляем до "Ожидает оплаты"
+                        if is_past_day:
                             updates.append(idx)
-                            logging.info(f"Заказ {order[0]} ({meal_type}) будет обновлен до 'Ожидает оплаты' при запуске")
+                            logging.info(f"Заказ {order[0]} (прошлый день: {delivery_date_str}) будет обновлен до 'Ожидает оплаты' при запуске")
+                        # Если заказ на текущий день и время уже прошло порог для этого типа еды
+                        elif is_today and is_valid_meal_type and is_time_passed:
+                            updates.append(idx)
+                            logging.info(f"Заказ {order[0]} ({meal_type}, сегодня) будет обновлен до 'Ожидает оплаты' при запуске")
                         else:
                             logging.info(f"Заказ {order[0]} ({meal_type}) не будет обновлен: не соответствует условиям")
                     except ValueError:
@@ -683,7 +686,29 @@ async def check_orders_awaiting_payment_at_startup():
                         logging.warning(f"Заказ {idx} (индекс {order_idx}) имеет статус {order[2]}, а не 'Принят'")
                         continue
                         
-                    # Проверяем, что это тип еды, который нужно обновлять
+                    # Получаем дату выдачи заказа
+                    delivery_date_str = order[11]
+                    if not delivery_date_str:
+                        logging.warning(f"Заказ {idx} (индекс {order_idx}) не имеет даты выдачи")
+                        continue
+                        
+                    # Парсим дату в формате DD.MM.YY
+                    try:
+                        delivery_date = datetime.strptime(delivery_date_str, "%d.%m.%y").date()
+                        
+                        # Для прошлых дней обновляем без дополнительных проверок
+                        if delivery_date < today:
+                            # Если все проверки пройдены, обновляем заказ
+                            logging.info(f"Перепроверка пройдена для заказа {idx} (индекс {order_idx}). Обновляем до 'Ожидает оплаты' (прошлый день)")
+                            orders_sheet.update(f'C{idx}', [['Ожидает оплаты']], value_input_option='USER_ENTERED')
+                            logging.info(f"Заказ в строке {idx} обновлен до 'Ожидает оплаты' при запуске бота (прошлый день)")
+                            actual_updates.append(idx)
+                            continue
+                    except ValueError:
+                        logging.error(f"Ошибка при парсинге даты выдачи заказа {order[0]}: {delivery_date_str}")
+                        continue
+                        
+                    # Для сегодняшних заказов - проверяем тип еды и время
                     meal_type = order[8]
                     if meal_type not in meal_types_to_check:
                         logging.warning(f"Заказ {idx} (индекс {order_idx}) имеет тип {meal_type}, который отсутствует в словаре meal_types_to_check")
@@ -695,9 +720,9 @@ async def check_orders_awaiting_payment_at_startup():
                         continue
                         
                     # Если все проверки пройдены, обновляем заказ
-                    logging.info(f"Перепроверка пройдена для заказа {idx} (индекс {order_idx}). Обновляем до 'Ожидает оплаты'")
+                    logging.info(f"Перепроверка пройдена для заказа {idx} (индекс {order_idx}). Обновляем до 'Ожидает оплаты' (сегодняшний день)")
                     orders_sheet.update(f'C{idx}', [['Ожидает оплаты']], value_input_option='USER_ENTERED')
-                    logging.info(f"Заказ в строке {idx} обновлен до 'Ожидает оплаты' при запуске бота")
+                    logging.info(f"Заказ в строке {idx} обновлен до 'Ожидает оплаты' при запуске бота (сегодняшний день)")
                     actual_updates.append(idx)
                 except Exception as e:
                     logging.error(f"Ошибка при перепроверке и обновлении заказа {idx}: {e}")
