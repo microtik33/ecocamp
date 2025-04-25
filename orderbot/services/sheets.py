@@ -594,9 +594,13 @@ async def check_orders_awaiting_payment_at_startup():
         today = now.date()
         current_hour = now.hour
         
+        logging.info(f"Проверка заказов для обновления до 'Ожидает оплаты'. Текущее время: {now.strftime('%Y-%m-%d %H:%M:%S')}, hour: {current_hour}")
+        
         # Получаем все заказы
         orders_sheet = get_orders_sheet()
         all_orders = orders_sheet.get_all_values()
+        
+        logging.info(f"Получено {len(all_orders)} строк заказов")
         
         # Создаем список для пакетного обновления
         updates = []
@@ -608,8 +612,13 @@ async def check_orders_awaiting_payment_at_startup():
             "Ужин": current_hour >= 19
         }
         
+        logging.info(f"Статусы проверки для типов еды: {meal_types_to_check}")
+        
         # Проходим по всем заказам и проверяем, нужно ли обновлять их статус
         for idx, order in enumerate(all_orders[1:], start=2):
+            # Подробный лог для отладки
+            logging.info(f"Проверка заказа {idx}: ID={order[0]}, Статус={order[2]}, Тип={order[8] if len(order) > 8 else 'N/A'}, Дата выдачи={order[11] if len(order) > 11 else 'N/A'}")
+            
             # Проверяем, что заказ имеет статус "Принят"
             if order[2] == 'Принят':
                 meal_type = order[8]  # Тип еды в 9-м столбце
@@ -621,53 +630,79 @@ async def check_orders_awaiting_payment_at_startup():
                         # Парсим дату в формате DD.MM.YY
                         delivery_date = datetime.strptime(delivery_date_str, "%d.%m.%y").date()
                         
+                        # Проверяем условия
+                        is_today = delivery_date == today
+                        is_valid_meal_type = meal_type in meal_types_to_check
+                        is_time_passed = is_valid_meal_type and meal_types_to_check[meal_type]
+                        
+                        logging.info(f"Условия для заказа {order[0]}: is_today={is_today}, is_valid_meal_type={is_valid_meal_type}, is_time_passed={is_time_passed}")
+                        
                         # Если заказ на текущий день и время уже прошло порог для этого типа еды,
                         # добавляем в список для обновления
-                        if delivery_date == today and meal_type in meal_types_to_check and meal_types_to_check[meal_type]:
+                        if is_today and is_valid_meal_type and is_time_passed:
                             updates.append(idx)
                             logging.info(f"Заказ {order[0]} ({meal_type}) будет обновлен до 'Ожидает оплаты' при запуске")
+                        else:
+                            logging.info(f"Заказ {order[0]} ({meal_type}) не будет обновлен: не соответствует условиям")
                     except ValueError:
                         logging.error(f"Ошибка при парсинге даты выдачи заказа {order[0]}: {delivery_date_str}")
                         continue
+                else:
+                    logging.info(f"Заказ {order[0]} не будет обновлен: отсутствует дата выдачи")
+            else:
+                logging.info(f"Заказ {order[0]} не будет обновлен: статус не 'Принят', а '{order[2]}'")
         
-        # Если есть заказы для обновления, выполняем пакетное обновление
+        logging.info(f"Заказы для обновления: {updates}")
+        
+        # Если есть заказы для обновления, выполняем обновления по отдельности для каждого заказа
         if updates:
-            # Сортируем индексы строк
-            updates.sort()
-            
-            # Группируем последовательные индексы
-            ranges = []
-            current_range = []
-            
+            # Обновляем каждый заказ по отдельности для максимальной точности и предсказуемости
+            actual_updates = []
             for idx in updates:
-                if not current_range or idx == current_range[-1] + 1:
-                    current_range.append(idx)
-                else:
-                    # Если последовательность прервалась, сохраняем текущий диапазон
-                    if len(current_range) == 1:
-                        ranges.append((f'C{current_range[0]}', [['Ожидает оплаты']]))
-                    else:
-                        ranges.append((
-                            f'C{current_range[0]}:C{current_range[-1]}',
-                            [['Ожидает оплаты']] * len(current_range)
-                        ))
-                    current_range = [idx]
+                # Проверяем еще раз, чтобы убедиться, что заказ все еще требует обновления
+                try:
+                    # Индекс в списке all_orders
+                    order_idx = idx - 1  # Номер строки - 1
+                    
+                    # Проверяем, что индекс не выходит за границы
+                    if order_idx < 0 or order_idx >= len(all_orders):
+                        logging.error(f"Индекс {order_idx} за пределами массива all_orders (длина {len(all_orders)})")
+                        continue
+                        
+                    order = all_orders[order_idx]
+                    
+                    logging.info(f"Перепроверка заказа {idx} (индекс {order_idx}): {order}")
+                    
+                    # Проверяем статус и тип еды
+                    if len(order) <= 8 or len(order) <= 11:
+                        logging.warning(f"Заказ {idx} (индекс {order_idx}) не имеет достаточно полей: {order}")
+                        continue
+                        
+                    # Проверяем, что это заказ со статусом "Принят"
+                    if order[2] != 'Принят':
+                        logging.warning(f"Заказ {idx} (индекс {order_idx}) имеет статус {order[2]}, а не 'Принят'")
+                        continue
+                        
+                    # Проверяем, что это тип еды, который нужно обновлять
+                    meal_type = order[8]
+                    if meal_type not in meal_types_to_check:
+                        logging.warning(f"Заказ {idx} (индекс {order_idx}) имеет тип {meal_type}, который отсутствует в словаре meal_types_to_check")
+                        continue
+                        
+                    # Проверяем, что для этого типа еды уже пришло время
+                    if not meal_types_to_check[meal_type]:
+                        logging.warning(f"Заказ {idx} (индекс {order_idx}) имеет тип {meal_type}, для которого еще не пришло время ({current_hour}:00)")
+                        continue
+                        
+                    # Если все проверки пройдены, обновляем заказ
+                    logging.info(f"Перепроверка пройдена для заказа {idx} (индекс {order_idx}). Обновляем до 'Ожидает оплаты'")
+                    orders_sheet.update(f'C{idx}', [['Ожидает оплаты']], value_input_option='USER_ENTERED')
+                    logging.info(f"Заказ в строке {idx} обновлен до 'Ожидает оплаты' при запуске бота")
+                    actual_updates.append(idx)
+                except Exception as e:
+                    logging.error(f"Ошибка при перепроверке и обновлении заказа {idx}: {e}")
             
-            # Добавляем последний диапазон
-            if current_range:
-                if len(current_range) == 1:
-                    ranges.append((f'C{current_range[0]}', [['Ожидает оплаты']]))
-                else:
-                    ranges.append((
-                        f'C{current_range[0]}:C{current_range[-1]}',
-                        [['Ожидает оплаты']] * len(current_range)
-                    ))
-            
-            # Выполняем пакетное обновление
-            for range_name, values in ranges:
-                orders_sheet.update(range_name, values, value_input_option='USER_ENTERED')
-            
-            logging.info(f"Обновлено {len(updates)} заказов на статус 'Ожидает оплаты' при запуске бота")
+            logging.info(f"Обновлено {len(actual_updates)} заказов на статус 'Ожидает оплаты' при запуске бота")
         else:
             logging.info("Нет заказов, требующих обновления статуса до 'Ожидает оплаты' при запуске")
         

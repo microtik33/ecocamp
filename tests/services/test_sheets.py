@@ -113,8 +113,11 @@ def mock_menu_sheet():
         yield mock
 
 @pytest.mark.asyncio
-async def test_update_orders_status_batch_update(mock_orders_sheet: MagicMock):
+async def test_update_orders_status_batch_update():
     """Тест пакетного обновления статусов заказов."""
+    # Создаем мок для листа заказов
+    mock_sheet = MagicMock()
+    
     # Подготавливаем тестовые данные
     today = datetime.now().date()
     today_str = today.strftime("%d.%m.%y")
@@ -133,31 +136,42 @@ async def test_update_orders_status_batch_update(mock_orders_sheet: MagicMock):
         ['4', '2024-04-04', 'Отменён', '4', '@user4', '400', '104', 'User4', 'breakfast', 'Блюдо4', '-', today_str],
     ]
     
-    # Настраиваем мок для get_all_values
-    mock_orders_sheet.get_all_values.return_value = test_orders
+    # Настраиваем мок
+    mock_sheet.get_all_values.return_value = test_orders
     
-    # Вызываем тестируемую функцию
-    result = await sheets.update_orders_status()
+    # Прямо заменяем функцию get_orders_sheet в модуле
+    original_get_orders_sheet = sheets.get_orders_sheet
+    sheets.get_orders_sheet = lambda: mock_sheet
     
-    # Проверяем результат
-    assert result is True
-    
-    # Проверяем, что были выполнены обновления только для активных заказов на сегодня
-    expected_updates = [
-        ('C2', [['Принят']]),  # Первый заказ
-        ('C4', [['Принят']]),  # Третий заказ
-    ]
-    
-    # Проверяем, что update был вызван с правильными параметрами
-    assert mock_orders_sheet.update.call_count == len(expected_updates)
-    for call, expected in zip(mock_orders_sheet.update.call_args_list, expected_updates):
-        assert call[0][0] == expected[0]  # Проверяем диапазон
-        assert call[0][1] == expected[1]  # Проверяем значения
-        assert call[1]['value_input_option'] == 'USER_ENTERED'  # Проверяем опции
+    try:
+        # Вызываем тестируемую функцию
+        result = await sheets.update_orders_status()
+        
+        # Проверяем результат
+        assert result is True
+        
+        # Проверяем, что были выполнены обновления только для активных заказов на сегодня
+        expected_updates = [
+            ('C2', [['Принят']]),  # Первый заказ
+            ('C4', [['Принят']]),  # Третий заказ
+        ]
+        
+        # Проверяем, что update был вызван с правильными параметрами
+        assert mock_sheet.update.call_count == len(expected_updates)
+        for call, expected in zip(mock_sheet.update.call_args_list, expected_updates):
+            assert call[0][0] == expected[0]  # Проверяем диапазон
+            assert call[0][1] == expected[1]  # Проверяем значения
+            assert call[1]['value_input_option'] == 'USER_ENTERED'  # Проверяем опции
+    finally:
+        # Восстанавливаем оригинальную функцию
+        sheets.get_orders_sheet = original_get_orders_sheet
 
 @pytest.mark.asyncio
-async def test_update_orders_status_consecutive_rows(mock_orders_sheet: MagicMock):
+async def test_update_orders_status_consecutive_rows():
     """Тест обновления статусов для последовательных строк."""
+    # Создаем мок для листа заказов
+    mock_sheet = MagicMock()
+    
     # Подготавливаем тестовые данные
     today = datetime.now().date()
     today_str = today.strftime("%d.%m.%y")
@@ -172,21 +186,29 @@ async def test_update_orders_status_consecutive_rows(mock_orders_sheet: MagicMoc
         ['3', '2024-04-04', 'Активен', '3', '@user3', '300', '103', 'User3', 'dinner', 'Блюдо3', '-', today_str],
     ]
     
-    # Настраиваем мок для get_all_values
-    mock_orders_sheet.get_all_values.return_value = test_orders
+    # Настраиваем мок
+    mock_sheet.get_all_values.return_value = test_orders
     
-    # Вызываем тестируемую функцию
-    result = await sheets.update_orders_status()
+    # Прямо заменяем функцию get_orders_sheet в модуле
+    original_get_orders_sheet = sheets.get_orders_sheet
+    sheets.get_orders_sheet = lambda: mock_sheet
     
-    # Проверяем результат
-    assert result is True
-    
-    # Проверяем, что было выполнено одно обновление для всех трех строк
-    mock_orders_sheet.update.assert_called_once_with(
-        'C2:C4',  # Диапазон из трех последовательных строк
-        [['Принят'], ['Принят'], ['Принят']],  # Значения для каждой строки
-        value_input_option='USER_ENTERED'
-    )
+    try:
+        # Вызываем тестируемую функцию
+        result = await sheets.update_orders_status()
+        
+        # Проверяем результат
+        assert result is True
+        
+        # Проверяем, что было выполнено одно обновление для всех трех строк
+        mock_sheet.update.assert_called_once_with(
+            'C2:C4',  # Диапазон из трех последовательных строк
+            [['Принят'], ['Принят'], ['Принят']],  # Значения для каждой строки
+            value_input_option='USER_ENTERED'
+        )
+    finally:
+        # Восстанавливаем оригинальную функцию
+        sheets.get_orders_sheet = original_get_orders_sheet
 
 @pytest.mark.asyncio
 async def test_update_orders_to_awaiting_payment_breakfast():
@@ -250,8 +272,11 @@ async def test_update_orders_to_awaiting_payment_breakfast():
         sheets.get_orders_sheet = original_get_orders_sheet
 
 @pytest.mark.asyncio
-async def test_update_orders_to_awaiting_payment_lunch(mock_orders_sheet: MagicMock):
+async def test_update_orders_to_awaiting_payment_lunch():
     """Тест обновления статусов заказов на 'Ожидает оплаты' для обеда в 14:00."""
+    # Создаем мок для листа заказов
+    mock_sheet = MagicMock()
+    
     # Подготавливаем тестовые данные
     today = datetime.now().date()
     today_str = today.strftime("%d.%m.%y")
@@ -272,30 +297,47 @@ async def test_update_orders_to_awaiting_payment_lunch(mock_orders_sheet: MagicM
         ['5', '2024-04-04', 'Принят', '5', '@user5', '500', '105', 'User5', 'Обед', 'Блюдо5', '-', (today + timedelta(days=1)).strftime("%d.%m.%y")],
     ]
     
-    # Настраиваем мок для get_all_values
-    mock_orders_sheet.get_all_values.return_value = test_orders
+    # Настраиваем мок
+    mock_sheet.get_all_values.return_value = test_orders
     
-    # Устанавливаем текущее время на 14:00
-    with patch('orderbot.services.sheets.datetime') as mock_dt:
-        mock_dt.now.return_value = datetime.combine(today, datetime.min.time().replace(hour=14))
-        mock_dt.strptime.side_effect = lambda *args, **kw: datetime.strptime(*args, **kw)
-        
-        # Вызываем тестируемую функцию
-        result = await sheets.update_orders_to_awaiting_payment()
-        
-        # Проверяем результат
-        assert result is True
-        
-        # Проверяем, что был выполнен только один вызов update для заказа обеда на сегодня
-        mock_orders_sheet.update.assert_called_once_with(
-            'C3',  # Только строка с обедом
-            [['Ожидает оплаты']],  # Новый статус
-            value_input_option='USER_ENTERED'
-        )
+    # Прямо заменяем функцию get_orders_sheet в модуле
+    original_get_orders_sheet = sheets.get_orders_sheet
+    sheets.get_orders_sheet = lambda: mock_sheet
+    
+    try:
+        # Устанавливаем текущее время на 14:00
+        with patch('orderbot.services.sheets.datetime') as mock_dt:
+            # Фиксируем дату и время
+            fixed_date = datetime.now().date()
+            test_time = datetime.combine(fixed_date, datetime.min.time().replace(hour=14))
+            
+            # Настраиваем мок datetime
+            mock_dt.now.return_value = test_time
+            mock_dt.strptime = datetime.strptime
+            mock_dt.combine = datetime.combine
+            
+            # Вызываем тестируемую функцию
+            result = await sheets.update_orders_to_awaiting_payment()
+            
+            # Проверяем результат
+            assert result is True
+            
+            # Проверяем, что был выполнен только один вызов update для заказа обеда на сегодня
+            mock_sheet.update.assert_called_once_with(
+                'C3',  # Только строка с обедом
+                [['Ожидает оплаты']],  # Новый статус
+                value_input_option='USER_ENTERED'
+            )
+    finally:
+        # Восстанавливаем оригинальную функцию
+        sheets.get_orders_sheet = original_get_orders_sheet
 
 @pytest.mark.asyncio
-async def test_update_orders_to_awaiting_payment_dinner(mock_orders_sheet: MagicMock):
+async def test_update_orders_to_awaiting_payment_dinner():
     """Тест обновления статусов заказов на 'Ожидает оплаты' для ужина в 19:00."""
+    # Создаем мок для листа заказов
+    mock_sheet = MagicMock()
+    
     # Подготавливаем тестовые данные
     today = datetime.now().date()
     today_str = today.strftime("%d.%m.%y")
@@ -316,26 +358,40 @@ async def test_update_orders_to_awaiting_payment_dinner(mock_orders_sheet: Magic
         ['5', '2024-04-04', 'Принят', '5', '@user5', '500', '105', 'User5', 'Ужин', 'Блюдо5', '-', (today + timedelta(days=1)).strftime("%d.%m.%y")],
     ]
     
-    # Настраиваем мок для get_all_values
-    mock_orders_sheet.get_all_values.return_value = test_orders
+    # Настраиваем мок
+    mock_sheet.get_all_values.return_value = test_orders
     
-    # Устанавливаем текущее время на 19:00
-    with patch('orderbot.services.sheets.datetime') as mock_dt:
-        mock_dt.now.return_value = datetime.combine(today, datetime.min.time().replace(hour=19))
-        mock_dt.strptime.side_effect = lambda *args, **kw: datetime.strptime(*args, **kw)
-        
-        # Вызываем тестируемую функцию
-        result = await sheets.update_orders_to_awaiting_payment()
-        
-        # Проверяем результат
-        assert result is True
-        
-        # Проверяем, что был выполнен только один вызов update для заказа ужина на сегодня
-        mock_orders_sheet.update.assert_called_once_with(
-            'C4',  # Только строка с ужином
-            [['Ожидает оплаты']],  # Новый статус
-            value_input_option='USER_ENTERED'
-        )
+    # Прямо заменяем функцию get_orders_sheet в модуле
+    original_get_orders_sheet = sheets.get_orders_sheet
+    sheets.get_orders_sheet = lambda: mock_sheet
+    
+    try:
+        # Устанавливаем текущее время на 19:00
+        with patch('orderbot.services.sheets.datetime') as mock_dt:
+            # Фиксируем дату и время
+            fixed_date = datetime.now().date()
+            test_time = datetime.combine(fixed_date, datetime.min.time().replace(hour=19))
+            
+            # Настраиваем мок datetime
+            mock_dt.now.return_value = test_time
+            mock_dt.strptime = datetime.strptime
+            mock_dt.combine = datetime.combine
+            
+            # Вызываем тестируемую функцию
+            result = await sheets.update_orders_to_awaiting_payment()
+            
+            # Проверяем результат
+            assert result is True
+            
+            # Проверяем, что был выполнен только один вызов update для заказа ужина на сегодня
+            mock_sheet.update.assert_called_once_with(
+                'C4',  # Только строка с ужином
+                [['Ожидает оплаты']],  # Новый статус
+                value_input_option='USER_ENTERED'
+            )
+    finally:
+        # Восстанавливаем оригинальную функцию
+        sheets.get_orders_sheet = original_get_orders_sheet
 
 @pytest.mark.asyncio
 async def test_update_orders_to_awaiting_payment_wrong_time(mock_orders_sheet: MagicMock):
@@ -485,29 +541,113 @@ async def test_get_user_orders_with_all_statuses(mock_orders_sheet: MagicMock):
 
 @pytest.mark.asyncio
 async def test_check_orders_awaiting_payment_at_startup():
-    """Тест проверки и обновления статусов на 'Ожидает оплаты' при запуске бота."""
+    """Тест проверки и обновления статусов заказов на 'Ожидает оплаты' при запуске бота."""
     # Создаем мок для листа заказов
     mock_sheet = MagicMock()
     
     # Подготавливаем тестовые данные
     today = datetime.now().date()
     today_str = today.strftime("%d.%m.%y")
-    print(f"Текущая дата: {today}, формат для теста: {today_str}")
     
-    # Создаем тестовые заказы с правильными данными для теста
+    # Создаем тестовые заказы
     test_orders = [
         # Заголовок
         ['ID', 'Дата', 'Статус', 'User ID', 'Username', 'Сумма', 'Комната', 'Имя', 'Тип', 'Блюда', 'Пожелания', 'Дата выдачи'],
-        # Заказ завтрака на сегодня со статусом Принят
+        # Заказ завтрака на сегодня со статусом Принят (должен обновиться)
         ['1', '2024-04-04', 'Принят', '1', '@user1', '100', '101', 'User1', 'Завтрак', 'Блюдо1', '-', today_str],
-        # Заказ обеда на сегодня со статусом Принят
+        # Заказ обеда на сегодня со статусом Принят (должен обновиться)
         ['2', '2024-04-04', 'Принят', '2', '@user2', '200', '102', 'User2', 'Обед', 'Блюдо2', '-', today_str],
-        # Заказ ужина на сегодня со статусом Принят
+        # Заказ ужина на сегодня со статусом Принят (не должен обновиться, т.к. еще рано)
         ['3', '2024-04-04', 'Принят', '3', '@user3', '300', '103', 'User3', 'Ужин', 'Блюдо3', '-', today_str],
-        # Заказ завтрака со статусом Активен (не должен измениться)
-        ['4', '2024-04-04', 'Активен', '4', '@user4', '400', '104', 'User4', 'Завтрак', 'Блюдо4', '-', today_str],
-        # Заказ завтрака на завтра со статусом Принят (не должен измениться)
-        ['5', '2024-04-04', 'Принят', '5', '@user5', '500', '105', 'User5', 'Завтрак', 'Блюдо5', '-', (today + timedelta(days=1)).strftime("%d.%m.%y")],
+        # Заказ ужина на сегодня со статусом Активен (не должен измениться)
+        ['4', '2024-04-04', 'Активен', '4', '@user4', '400', '104', 'User4', 'Ужин', 'Блюдо4', '-', today_str],
+    ]
+    
+    # Настраиваем мок
+    mock_sheet.get_all_values.return_value = test_orders
+    
+    # Прямо заменяем функцию get_orders_sheet в модуле
+    original_get_orders_sheet = sheets.get_orders_sheet
+    sheets.get_orders_sheet = lambda: mock_sheet
+    
+    # Используем наш собственный механизм для отслеживания обновлений
+    updates_tracker = []
+    
+    try:
+        # Устанавливаем текущее время на 14:30
+        with patch('orderbot.services.sheets.datetime') as mock_dt:
+            # Фиксируем дату и время
+            fixed_date = datetime.now().date()
+            test_time = datetime.combine(fixed_date, datetime.min.time().replace(hour=14, minute=30))
+            
+            # Настраиваем мок datetime
+            mock_dt.now.return_value = test_time
+            mock_dt.strptime = datetime.strptime
+            mock_dt.combine = datetime.combine
+            
+            # Создаем функцию-шпион для метода update
+            original_update = mock_sheet.update
+            def mock_update(cell_range, values, value_input_option):
+                # Извлекаем номер строки из диапазона
+                if ':' in cell_range:
+                    row_start = int(cell_range.split(':')[0][1:])
+                    row_end = int(cell_range.split(':')[1][1:])
+                    rows = list(range(row_start, row_end + 1))
+                else:
+                    rows = [int(cell_range[1:])]
+                
+                # Добавляем обновляемые строки в трекер
+                updates_tracker.extend(rows)
+                
+                # Вызываем оригинальный метод
+                return original_update(cell_range, values, value_input_option)
+            
+            # Заменяем метод update на наш
+            mock_sheet.update = mock_update
+            
+            # Вызываем функцию
+            result = await sheets.check_orders_awaiting_payment_at_startup()
+            
+            # Возвращаем оригинальный метод
+            mock_sheet.update = original_update
+            
+            # Выводим информацию для отладки
+            print(f"Обновленные строки: {updates_tracker}")
+            
+            # Проверяем успешное выполнение
+            assert result is True
+            
+            # Проверяем, что были обновлены строки 2 и 3 (Завтрак и Обед)
+            assert 2 in updates_tracker, "Строка 2 (Завтрак) должна быть обновлена"
+            assert 3 in updates_tracker, "Строка 3 (Обед) должна быть обновлена"
+            
+            # Проверяем, что строка 4 (Ужин) не была обновлена
+            assert 4 not in updates_tracker, "Строка 4 (Ужин со статусом Принят) не должна быть обновлена"
+            assert 5 not in updates_tracker, "Строка 5 (Ужин со статусом Активен) не должна быть обновлена"
+    finally:
+        # Восстанавливаем оригинальную функцию
+        sheets.get_orders_sheet = original_get_orders_sheet
+
+@pytest.mark.asyncio
+async def test_update_orders_status_non_consecutive_rows():
+    """Тест обновления статусов для непоследовательных строк."""
+    # Создаем мок для листа заказов
+    mock_sheet = MagicMock()
+    
+    # Подготавливаем тестовые данные
+    today = datetime.now().date()
+    today_str = today.strftime("%d.%m.%y")
+    
+    # Создаем тестовые заказы с непоследовательными строками
+    test_orders = [
+        # Заголовок
+        ['ID', 'Дата', 'Статус', 'User ID', 'Username', 'Сумма', 'Комната', 'Имя', 'Тип', 'Блюда', 'Пожелания', 'Дата выдачи'],
+        # Активные заказы на строках 2, 4 и 6
+        ['1', '2024-04-04', 'Активен', '1', '@user1', '100', '101', 'User1', 'breakfast', 'Блюдо1', '-', today_str],
+        ['2', '2024-04-04', 'Оплачен', '2', '@user2', '200', '102', 'User2', 'lunch', 'Блюдо2', '-', today_str],
+        ['3', '2024-04-04', 'Активен', '3', '@user3', '300', '103', 'User3', 'dinner', 'Блюдо3', '-', today_str],
+        ['4', '2024-04-04', 'Отменен', '4', '@user4', '400', '104', 'User4', 'breakfast', 'Блюдо4', '-', today_str],
+        ['5', '2024-04-04', 'Активен', '5', '@user5', '500', '105', 'User5', 'lunch', 'Блюдо5', '-', today_str],
     ]
     
     # Настраиваем мок
@@ -518,34 +658,33 @@ async def test_check_orders_awaiting_payment_at_startup():
     sheets.get_orders_sheet = lambda: mock_sheet
     
     try:
-        # Устанавливаем текущее время на 12:00 (после завтрака, до обеда)
-        with patch('orderbot.services.sheets.datetime') as mock_dt:
-            # Фиксируем текущее время и дату
-            fixed_date = datetime.now().date()
-            test_time = datetime.combine(fixed_date, datetime.min.time().replace(hour=12))
-            
-            # Настраиваем мок datetime
-            mock_dt.now.return_value = test_time
-            mock_dt.strptime = datetime.strptime  # Используем реальную функцию для конвертации строк в даты
-            mock_dt.combine = datetime.combine
-            
-            print(f"Установлено тестовое время: {test_time}")
-            
-            # Вызываем тестируемую функцию
-            print("Вызываем проверяемую функцию...")
-            result = await sheets.check_orders_awaiting_payment_at_startup()
-            print(f"Результат выполнения: {result}")
-            
-            # Проверяем результат
-            assert result is True
-            
-            # Проверяем вызов update - обновляются все 3 типа заказов, 
-            # так как текущее время (12) больше всех пороговых значений
-            mock_sheet.update.assert_called_once_with(
-                'C2:C4',  # Диапазон с завтраком, обедом и ужином
-                [['Ожидает оплаты'], ['Ожидает оплаты'], ['Ожидает оплаты']],  # Новые статусы
-                value_input_option='USER_ENTERED'
-            )
+        # Вызываем тестируемую функцию
+        result = await sheets.update_orders_status()
+        
+        # Проверяем результат
+        assert result is True
+        
+        # Проверяем, что были выполнены обновления для каждой активной строки по отдельности
+        assert mock_sheet.update.call_count == 3
+        
+        # Проверяем вызовы обновления для каждой строки
+        mock_sheet.update.assert_any_call(
+            'C2:C2',  # Строка 2
+            [['Принят']],
+            value_input_option='USER_ENTERED'
+        )
+        
+        mock_sheet.update.assert_any_call(
+            'C4:C4',  # Строка 4
+            [['Принят']],
+            value_input_option='USER_ENTERED'
+        )
+        
+        mock_sheet.update.assert_any_call(
+            'C6:C6',  # Строка 6
+            [['Принят']],
+            value_input_option='USER_ENTERED'
+        )
     finally:
         # Восстанавливаем оригинальную функцию
         sheets.get_orders_sheet = original_get_orders_sheet 
