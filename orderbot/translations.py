@@ -1,6 +1,6 @@
 # translations.py
 
-# Перевод типов еды
+# Перевод типов еды (оставляем для обратной совместимости)
 MEAL_TYPE_TRANSLATIONS = {
     'breakfast': 'Завтрак',
     'lunch': 'Обед',

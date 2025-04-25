@@ -61,7 +61,7 @@ def get_orders_summary():
                     total_orders += 1
                     
                     # Получаем тип приема пищи и список блюд
-                    meal_type = order[8]  # breakfast, lunch или dinner
+                    meal_type = order[8]  # Тип еды: Завтрак, Обед или Ужин
                     dishes = [dish.strip() for dish in order[9].split(',')]
                     wishes = order[10] if order[10] and order[10] != "—" else None
                     
@@ -76,7 +76,7 @@ def get_orders_summary():
                     order_description += "─" * 30 # Разделитель между заказами
                     
                     # Добавляем заказ в соответствующий список
-                    if meal_type == 'breakfast':
+                    if meal_type == 'Завтрак':
                         breakfast_orders.append(order_description)
                         for dish in dishes:
                             # Разбираем строку с блюдом и количеством
@@ -85,7 +85,7 @@ def get_orders_summary():
                                 breakfast_dishes[dish_name] += int(quantity)
                             else:
                                 breakfast_dishes[dish] += 1
-                    elif meal_type == 'lunch':
+                    elif meal_type == 'Обед':
                         lunch_orders.append(order_description)
                         for dish in dishes:
                             if ' x' in dish:
@@ -93,7 +93,7 @@ def get_orders_summary():
                                 lunch_dishes[dish_name] += int(quantity)
                             else:
                                 lunch_dishes[dish] += 1
-                    elif meal_type == 'dinner':
+                    elif meal_type == 'Ужин':
                         dinner_orders.append(order_description)
                         for dish in dishes:
                             if ' x' in dish:

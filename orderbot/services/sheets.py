@@ -139,9 +139,9 @@ def _update_menu_cache(force=False):
     # Если кэш пустой или устарел, или требуется принудительное обновление
     if force or not _last_menu_update or (current_time - _last_menu_update) > _MENU_CACHE_TTL:
         column_map = {
-            'breakfast': (1, 2, 3),  # A, B и C столбцы
-            'lunch': (4, 5, 6),      # D, E и F столбцы
-            'dinner': (7, 8, 9)      # G, H и I столбцы
+            'Завтрак': (1, 2, 3),  # A, B и C столбцы
+            'Обед': (4, 5, 6),      # D, E и F столбцы
+            'Ужин': (7, 8, 9)      # G, H и I столбцы
         }
         
         menu_sheet = get_menu_sheet()
@@ -609,6 +609,7 @@ async def check_orders_awaiting_payment_at_startup():
         updates = []
         
         # Словарь для определения, какие типы еды нужно обновить в зависимости от времени
+        # Используем русские названия типов еды
         meal_types_to_check = {
             "Завтрак": current_hour >= 9,
             "Обед": current_hour >= 14,

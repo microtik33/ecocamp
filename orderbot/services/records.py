@@ -82,7 +82,7 @@ async def process_daily_orders():
         dinner_dishes = defaultdict(int)
         
         for order in accepted_orders:
-            meal_type = order[8].lower()  # Тип еды, приводим к нижнему регистру
+            meal_type = order[8]  # Тип еды, берем оригинальное значение (без приведения к нижнему регистру)
             dishes_str = order[9]  # Строка с блюдами
             
             # Парсим строку с блюдами
@@ -95,11 +95,11 @@ async def process_daily_orders():
                     quantity = 1
                 
                 # Добавляем блюдо в соответствующий словарь
-                if meal_type == 'breakfast':
+                if meal_type == 'Завтрак':
                     breakfast_dishes[dish] += quantity
-                elif meal_type == 'lunch':
+                elif meal_type == 'Обед':
                     lunch_dishes[dish] += quantity
-                elif meal_type == 'dinner':
+                elif meal_type == 'Ужин':
                     dinner_dishes[dish] += quantity
         
         logging.info(f"Блюд на завтрак: {len(breakfast_dishes)}")

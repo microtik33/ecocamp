@@ -185,7 +185,7 @@ async def main() -> None:
                     CallbackQueryHandler(handle_order_update, pattern='back')
                 ],
                 MEAL_TYPE: [
-                    CallbackQueryHandler(show_dishes, pattern='^meal:(breakfast|lunch|dinner)$'),
+                    CallbackQueryHandler(show_dishes, pattern='^meal:(Завтрак|Обед|Ужин)$'),
                     CallbackQueryHandler(handle_order_update, pattern='cancel'),
                     CallbackQueryHandler(handle_order_update, pattern='back')
                 ],

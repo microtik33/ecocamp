@@ -202,11 +202,11 @@ async def ask_meal_type(update: telegram.Update, context: telegram.ext.ContextTy
     keyboard = [
         [
             InlineKeyboardButton(f"{translations.get_button('breakfast')} ({breakfast_str})", 
-                               callback_data="meal:breakfast"),
+                               callback_data="meal:Завтрак"),
             InlineKeyboardButton(f"{translations.get_button('lunch')} ({lunch_str})", 
-                               callback_data="meal:lunch"),
+                               callback_data="meal:Обед"),
             InlineKeyboardButton(f"{translations.get_button('dinner')} ({dinner_str})", 
-                               callback_data="meal:dinner")
+                               callback_data="meal:Ужин")
         ],
         [InlineKeyboardButton(translations.get_button('back'), callback_data="back")],
         [InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")]
@@ -1249,11 +1249,11 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
             keyboard = [
                 [
                     InlineKeyboardButton(f"{translations.get_button('breakfast')} ({breakfast_str})", 
-                                       callback_data="meal:breakfast"),
+                                       callback_data="meal:Завтрак"),
                     InlineKeyboardButton(f"{translations.get_button('lunch')} ({lunch_str})", 
-                                       callback_data="meal:lunch"),
+                                       callback_data="meal:Обед"),
                     InlineKeyboardButton(f"{translations.get_button('dinner')} ({dinner_str})", 
-                                       callback_data="meal:dinner")
+                                       callback_data="meal:Ужин")
                 ],
                 [InlineKeyboardButton(translations.get_button('back'), callback_data="back")],
                 [InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")]

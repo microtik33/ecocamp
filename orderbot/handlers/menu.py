@@ -196,33 +196,28 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
         # Формируем сообщение с меню
         message = f"🍽️ Меню на {tomorrow}:\n\n"
         
-        # Добавляем блюда для завтрака
-        message += "🌅 *Завтрак*\n"
-        breakfast_dishes = get_dishes_for_meal('breakfast')
-        if breakfast_dishes:
-            for dish, price, weight in breakfast_dishes:
-                if dish.strip():  # Проверяем, что название блюда не пустое
-                    message += f"- *{dish}* ({weight}) {price} р\n"
-        else:
-            message += "Нет доступных блюд\n"
+        # Функция для добавления блюд определенного типа в сообщение
+        def add_dishes_for_meal_type(meal_type, title):
+            nonlocal message
+            dishes = get_dishes_for_meal(meal_type)
+            
+            if dishes:
+                message += f"\n*{title}*:\n"
+                for dish, price, weight in dishes:
+                    if dish.strip():
+                        dish_info = f"{dish}"
+                        if price:
+                            dish_info += f" — {price} р."
+                        if weight:
+                            dish_info += f" ({weight})"
+                        message += f"• {dish_info}\n"
+            else:
+                message += f"\n*{title}*: нет блюд\n"
         
-        message += "\n🕛 *Обед*\n"
-        lunch_dishes = get_dishes_for_meal('lunch')
-        if lunch_dishes:
-            for dish, price, weight in lunch_dishes:
-                if dish.strip():  # Проверяем, что название блюда не пустое
-                    message += f"- *{dish}* ({weight}) {price} р\n"
-        else:
-            message += "Нет доступных блюд\n"
-        
-        message += "\n🌇 *Ужин*\n"
-        dinner_dishes = get_dishes_for_meal('dinner')
-        if dinner_dishes:
-            for dish, price, weight in dinner_dishes:
-                if dish.strip():  # Проверяем, что название блюда не пустое
-                    message += f"- *{dish}* ({weight}) {price} р\n"
-        else:
-            message += "Нет доступных блюд\n"
+        # Добавляем блюда для каждого типа питания
+        add_dishes_for_meal_type('Завтрак')
+        add_dishes_for_meal_type('Обед')
+        add_dishes_for_meal_type('Ужин')
         
         # Кнопки возврата в главное меню и просмотра составов
         keyboard = [
@@ -343,9 +338,9 @@ async def show_dish_compositions(update: telegram.Update, context: telegram.ext.
                 message += "Нет доступных блюд\n\n"
         
         # Добавляем составы для каждого типа приема пищи
-        add_compositions_for_meal_type('breakfast', 'Завтрак')
-        add_compositions_for_meal_type('lunch', 'Обед')
-        add_compositions_for_meal_type('dinner', 'Ужин')
+        add_compositions_for_meal_type('Завтрак')
+        add_compositions_for_meal_type('Обед')
+        add_compositions_for_meal_type('Ужин')
         
         # Кнопки навигации
         keyboard = [
