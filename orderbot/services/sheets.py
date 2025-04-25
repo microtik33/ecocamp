@@ -581,7 +581,7 @@ async def check_orders_awaiting_payment_at_startup():
     
     Функция вызывается после обновления статусов с 'Активен' на 'Принят'.
     Она проверяет заказы со статусом 'Принят' и:
-    1. Для заказов прошлых дней (до сегодня) - меняет статус на 'Ожидает оплаты' без дополнительных проверок
+    1. Для заказов прошлых дней (до сегодня, но не старше 5 дней) - меняет статус на 'Ожидает оплаты' без дополнительных проверок
     2. Для заказов сегодняшнего дня - проверяет тип еды и текущее время:
        - Заказы завтрака: после 9:00
        - Заказы обеда: после 14:00
@@ -593,7 +593,11 @@ async def check_orders_awaiting_payment_at_startup():
         today = now.date()
         current_hour = now.hour
         
+        # Рассчитываем дату 5 дней назад
+        five_days_ago = today - timedelta(days=5)
+        
         logging.info(f"Проверка заказов для обновления до 'Ожидает оплаты'. Текущее время: {now.strftime('%Y-%m-%d %H:%M:%S')}, hour: {current_hour}")
+        logging.info(f"Будут проверены заказы начиная с даты: {five_days_ago.strftime('%d.%m.%y')}")
         
         # Получаем все заказы
         orders_sheet = get_orders_sheet()
@@ -629,15 +633,20 @@ async def check_orders_awaiting_payment_at_startup():
                         # Парсим дату в формате DD.MM.YY
                         delivery_date = datetime.strptime(delivery_date_str, "%d.%m.%y").date()
                         
+                        # Пропускаем заказы старше 5 дней
+                        if delivery_date < five_days_ago:
+                            logging.info(f"Заказ {order[0]} пропущен: дата выдачи {delivery_date_str} старше 5 дней")
+                            continue
+                        
                         # Проверяем условия
                         is_today = delivery_date == today
-                        is_past_day = delivery_date < today
+                        is_past_day = delivery_date < today and delivery_date >= five_days_ago
                         is_valid_meal_type = meal_type in meal_types_to_check
                         is_time_passed = is_valid_meal_type and meal_types_to_check[meal_type]
                         
                         logging.info(f"Условия для заказа {order[0]}: is_today={is_today}, is_past_day={is_past_day}, is_valid_meal_type={is_valid_meal_type}, is_time_passed={is_time_passed}")
                         
-                        # Если заказ на прошлый день - безусловно обновляем до "Ожидает оплаты"
+                        # Если заказ на прошлый день (не старше 5 дней) - безусловно обновляем до "Ожидает оплаты"
                         if is_past_day:
                             updates.append(idx)
                             logging.info(f"Заказ {order[0]} (прошлый день: {delivery_date_str}) будет обновлен до 'Ожидает оплаты' при запуске")
@@ -695,6 +704,11 @@ async def check_orders_awaiting_payment_at_startup():
                     # Парсим дату в формате DD.MM.YY
                     try:
                         delivery_date = datetime.strptime(delivery_date_str, "%d.%m.%y").date()
+                        
+                        # Еще раз проверяем, что заказ не старше 5 дней
+                        if delivery_date < five_days_ago:
+                            logging.warning(f"Заказ {idx} (индекс {order_idx}) имеет дату {delivery_date_str}, которая старше 5 дней")
+                            continue
                         
                         # Для прошлых дней обновляем без дополнительных проверок
                         if delivery_date < today:
