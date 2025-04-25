@@ -65,7 +65,7 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     orders_sheet = get_orders_sheet()
     all_orders = orders_sheet.get_all_values()
-    user_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] in ['Принят', 'Активен']]
+    user_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] in ['Принят', 'Активен', 'Ожидает оплаты']]
     
     if not user_orders:
         keyboard = [
@@ -385,7 +385,7 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
             
             for order_id in user_data['payment']['orders']:
                 for idx, row in enumerate(all_orders):
-                    if row[0] == order_id and row[2] in ['Принят', 'Активен']:
+                    if row[0] == order_id and row[2] in ['Принят', 'Активен', 'Ожидает оплаты']:
                         # Обновляем статус заказа на "Оплачен"
                         orders_sheet.update_cell(idx + 1, 3, 'Оплачен')
             
@@ -568,7 +568,7 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             
             for order_id in context.user_data['payment']['orders']:
                 for idx, row in enumerate(all_orders):
-                    if row[0] == order_id and row[2] in ['Принят', 'Активен']:
+                    if row[0] == order_id and row[2] in ['Принят', 'Активен', 'Ожидает оплаты']:
                         # Обновляем статус заказа на "Оплачен"
                         orders_sheet.update_cell(idx + 1, 3, 'Оплачен')
             
