@@ -197,12 +197,12 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
         message = f"🍽️ Меню на {tomorrow}:\n\n"
         
         # Функция для добавления блюд определенного типа в сообщение
-        def add_dishes_for_meal_type(meal_type, title):
+        def add_dishes_for_meal_type(meal_type):
             nonlocal message
+            message += f"\n*{meal_type}*:\n"
             dishes = get_dishes_for_meal(meal_type)
             
             if dishes:
-                message += f"\n*{title}*:\n"
                 for dish, price, weight in dishes:
                     if dish.strip():
                         dish_info = f"{dish}"
@@ -212,7 +212,7 @@ async def show_tomorrow_menu(update: telegram.Update, context: telegram.ext.Cont
                             dish_info += f" ({weight})"
                         message += f"• {dish_info}\n"
             else:
-                message += f"\n*{title}*: нет блюд\n"
+                message += f"\n*{meal_type}*: нет блюд\n"
         
         # Добавляем блюда для каждого типа питания
         add_dishes_for_meal_type('Завтрак')
@@ -318,9 +318,9 @@ async def show_dish_compositions(update: telegram.Update, context: telegram.ext.
         message = f"🍴 Составы блюд на {tomorrow}:\n\n"
         
         # Функция для добавления информации о составах блюд
-        def add_compositions_for_meal_type(meal_type, meal_title):
+        def add_compositions_for_meal_type(meal_type):
             nonlocal message
-            message += f"*{meal_title}:*\n\n"
+            message += f"*{meal_type}:*\n\n"
             dishes = get_dishes_for_meal(meal_type)
             if dishes:
                 for dish, _, _ in dishes:
