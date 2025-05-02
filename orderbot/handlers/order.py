@@ -1080,6 +1080,17 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
             await query.edit_message_text(message, reply_markup=reply_markup)
             return MENU
         
+        # Проверяем, что заказ активен
+        if order_info['status'] != 'Активен':
+            message = translations.get_message('order_not_active')
+            keyboard = [
+                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
+                [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(message, reply_markup=reply_markup)
+            return MENU
+        
         # Сохраняем информацию о заказе в контексте
         context.user_data['order'] = order_info
         context.user_data['editing'] = True
@@ -1331,8 +1342,8 @@ async def show_edit_active_orders(update: telegram.Update, context: telegram.ext
     from orderbot.services.sheets import get_orders_sheet
     orders_sheet = get_orders_sheet()
     all_orders = orders_sheet.get_all_values()
-    # Фильтруем только активные заказы и заказы, ожидающие оплаты
-    editable_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] in ['Активен', 'Ожидает оплаты']]
+    # Фильтруем только активные заказы
+    editable_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] == 'Активен']
     
     if not editable_orders:
         message = translations.get_message('no_active_orders')
@@ -1355,9 +1366,7 @@ async def show_edit_active_orders(update: telegram.Update, context: telegram.ext
         meal_type = order[8]
         meal_type_with_date = f"{translations.get_meal_type(meal_type)} ({delivery_date})" if delivery_date else translations.get_meal_type(meal_type)
         
-        # Добавляем статус заказа в текст кнопки
-        status_text = " (Ожидает оплаты)" if order[2] == 'Ожидает оплаты' else ""
-        button_text = f"Заказ {order[0]} - {meal_type_with_date}{status_text}"
+        button_text = f"Заказ {order[0]} - {meal_type_with_date}"
         keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_order:{order[0]}")])
     
     # Добавляем кнопку возврата
