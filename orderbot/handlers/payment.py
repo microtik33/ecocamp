@@ -11,7 +11,7 @@ from PIL import Image
 
 from ..services import sbp
 from .. import translations
-from ..services.sheets import get_orders_sheet, update_order
+from ..services.sheets import get_orders_sheet, update_order, save_payment_info, get_payments_sheet
 from ..config import TOCHKA_ACCOUNT_ID, TOCHKA_MERCHANT_ID, TOCHKA_JWT_TOKEN
 from ..utils.auth_decorator import require_auth
 from .states import MENU, PAYMENT
@@ -120,6 +120,30 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             )
             return MENU
         
+        # Сохраняем информацию об оплате в таблицу
+        payment_saved = await save_payment_info(
+            user_id=str(update.effective_user.id),
+            amount=total_sum,
+            status="ожидает"
+        )
+        
+        if not payment_saved:
+            logger.error("Не удалось сохранить информацию об оплате в таблицу")
+            keyboard = [
+                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                translations.get_message('payment_error'),
+                reply_markup=reply_markup
+            )
+            return MENU
+        
+        # Получаем ID последней сохраненной оплаты
+        payments_sheet = get_payments_sheet()
+        all_payments = payments_sheet.get_all_values()
+        last_payment_id = all_payments[-1][0] if len(all_payments) > 1 else "1"
+        
         # Сохраняем данные о платеже в контексте
         context.user_data['payment'] = {
             'qrc_id': qr_data['qrcId'],
@@ -127,7 +151,8 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             'orders': [order[0] for order in user_orders],  # Список ID заказов
             'created_at': datetime.now().isoformat(),
             'payload': qr_data.get('payload', ''),
-            'status_checks': 0  # Счетчик проверок статуса
+            'status_checks': 0,  # Счетчик проверок статуса
+            'payment_id': last_payment_id  # ID оплаты в таблице
         }
         
         # Декодируем изображение QR-кода из base64
@@ -389,6 +414,10 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
                         # Обновляем статус заказа на "Оплачен"
                         orders_sheet.update_cell(idx + 1, 3, 'Оплачен')
             
+            # Обновляем статус оплаты в таблице
+            payments_sheet = get_payments_sheet()
+            await update_payment_status(payments_sheet, user_data['payment'].get('payment_id', ''), "оплачено")
+            
             # Удаляем сообщение с QR-кодом, если оно есть
             try:
                 if 'qr_message_id' in user_data['payment']:
@@ -430,6 +459,11 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
                 f"Причина: {payment_message}\n\n"
                 f"Попробуйте создать новый платеж или выберите другой способ оплаты."
             )
+            
+            # Обновляем статус оплаты в таблице
+            payments_sheet = get_payments_sheet()
+            await update_payment_status(payments_sheet, user_data['payment'].get('payment_id', ''), "отменено")
+            
             keyboard = [
                 [InlineKeyboardButton(translations.get_button('pay_orders'), callback_data='pay_orders')],
                 [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')]
@@ -572,6 +606,10 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
                         # Обновляем статус заказа на "Оплачен"
                         orders_sheet.update_cell(idx + 1, 3, 'Оплачен')
             
+            # Обновляем статус оплаты в таблице
+            payments_sheet = get_payments_sheet()
+            await update_payment_status(payments_sheet, context.user_data['payment'].get('payment_id', ''), "оплачено")
+            
             # Удаляем сообщение с QR-кодом, если оно есть
             try:
                 if 'qr_message_id' in context.user_data['payment']:
@@ -660,6 +698,11 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
                 f"Причина: {payment_message}\n\n"
                 f"Попробуйте создать новый платеж или выберите другой способ оплаты."
             )
+            
+            # Обновляем статус оплаты в таблице
+            payments_sheet = get_payments_sheet()
+            await update_payment_status(payments_sheet, context.user_data['payment'].get('payment_id', ''), "отменено")
+            
             keyboard = [
                 [InlineKeyboardButton(translations.get_button('pay_orders'), callback_data='pay_orders')],
                 [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')]
@@ -822,6 +865,11 @@ async def cancel_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     query = update.callback_query
     await query.answer()
     
+    # Обновляем статус оплаты в таблице
+    if 'payment' in context.user_data and 'payment_id' in context.user_data['payment']:
+        payments_sheet = get_payments_sheet()
+        await update_payment_status(payments_sheet, context.user_data['payment']['payment_id'], "отменено")
+    
     # Останавливаем автоматическую проверку, если job_queue доступен
     if context.job_queue:
         try:
@@ -880,4 +928,33 @@ async def cancel_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if 'payment' in context.user_data:
         del context.user_data['payment']
     
-    return MENU 
+    return MENU
+
+async def update_payment_status(payments_sheet, payment_id: str, new_status: str) -> bool:
+    """Обновляет статус оплаты в таблице.
+    
+    Args:
+        payments_sheet: Лист с оплатами
+        payment_id: Номер оплаты
+        new_status: Новый статус
+        
+    Returns:
+        bool: True в случае успешного обновления, False в противном случае
+    """
+    try:
+        # Получаем все значения из таблицы
+        all_payments = payments_sheet.get_all_values()
+        
+        # Ищем строку с нужным номером оплаты
+        for idx, row in enumerate(all_payments[1:], start=2):  # Пропускаем заголовок
+            if row[0] == payment_id:
+                # Обновляем статус в последнем столбце
+                payments_sheet.update_cell(idx, 6, new_status)
+                logging.info(f"Статус оплаты {payment_id} обновлен на '{new_status}'")
+                return True
+                
+        logging.warning(f"Оплата с номером {payment_id} не найдена в таблице")
+        return False
+    except Exception as e:
+        logging.error(f"Ошибка при обновлении статуса оплаты: {e}")
+        return False 

@@ -26,6 +26,7 @@ COMPOSITION_SHEET_ID = 1127521486  # ID листа с составом блюд
 TODAY_MENU_SHEET_ID = 1169304186   # ID листа с меню на сегодня
 QUESTIONS_SHEET_ID = 1085408822    # ID листа с вопросами
 ADMINS_SHEET_ID = 497772348        # ID листа с администраторами
+PAYMENTS_SHEET_ID = 1774741525     # ID листа с оплатами
 
 @profile_time
 def get_orders_sheet():
@@ -951,6 +952,83 @@ def get_admins_ids() -> List[str]:
     except Exception as e:
         logging.error(f"Ошибка при получении списка администраторов: {e}")
         return []
+
+
+
+@profile_time
+def get_payments_sheet():
+    """Получение листа оплат."""
+    try:
+        return spreadsheet.get_worksheet_by_id(PAYMENTS_SHEET_ID)
+    except gspread.WorksheetNotFound:
+        sheet = spreadsheet.add_worksheet("Payments", 1000, 6)
+        sheet.update('A1:F1', [['Номер оплаты', 'Дата и время', 'User ID', 'Комментарий', 'Сумма', 'Статус']])
+        return sheet
+
+def get_next_payment_id() -> str:
+    """Получение следующего номера оплаты.
+    
+    Returns:
+        str: Следующий доступный номер оплаты
+    """
+    try:
+        payments_sheet = get_payments_sheet()
+        all_payments = payments_sheet.get_all_values()
+        
+        # Если в таблице только заголовок или она пуста
+        if len(all_payments) <= 1:
+            return "1"
+            
+        # Получаем все номера оплат из первого столбца (пропускаем заголовок)
+        payment_ids = [int(row[0]) for row in all_payments[1:] if row[0].isdigit()]
+        
+        # Если нет ни одного номера, начинаем с 1
+        if not payment_ids:
+            return "1"
+            
+        # Возвращаем следующий номер
+        return str(max(payment_ids) + 1)
+    except Exception as e:
+        logging.error(f"Ошибка при получении следующего номера оплаты: {e}")
+        return "1"
+
+async def save_payment_info(user_id: str, amount: float, status: str = "ожидает") -> bool:
+    """Сохранение информации об оплате в таблицу.
+    
+    Args:
+        user_id: ID пользователя
+        amount: Сумма оплаты
+        status: Статус оплаты (ожидает, оплачено, отменено)
+        
+    Returns:
+        bool: True в случае успешного сохранения, False в противном случае
+    """
+    try:
+        # Получаем следующий номер оплаты
+        next_id = get_next_payment_id()
+        
+        # Форматируем текущую дату и время
+        now = datetime.now()
+        formatted_datetime = now.strftime("%d.%m.%y %H:%M:%S")
+        
+        # Формируем строку для записи
+        row = [
+            next_id,              # Номер оплаты
+            formatted_datetime,   # Дата и время
+            user_id,             # User ID
+            "",                  # Пустой комментарий
+            str(amount),         # Сумма оплаты
+            status              # Статус оплаты
+        ]
+        
+        # Добавляем запись в таблицу
+        get_payments_sheet().append_row(row, value_input_option='USER_ENTERED')
+        logging.info(f"Информация об оплате {next_id} сохранена в таблицу")
+        return True
+        
+    except Exception as e:
+        logging.error(f"Ошибка при сохранении информации об оплате: {e}")
+        return False
 
 async def save_question(user_id: str, question_text: str) -> bool:
     """Сохранение вопроса в таблицу.
