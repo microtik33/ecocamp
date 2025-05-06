@@ -32,7 +32,7 @@ from .handlers import handle_question, save_question, ask_command
 from .handlers.auth import start as auth_start, handle_phone, setup_commands_for_user
 from .handlers.kitchen import kitchen_summary, search_orders_by_room, search_orders_by_number, find_orders_by_room, back_to_kitchen, handle_order_number_input
 from .handlers.stats import performance_stats, clear_performance_stats, memory_stats, function_stats
-from .handlers.payment import create_payment, check_payment_status, cancel_payment
+from .handlers.payment import create_payment, check_payment_status, cancel_payment, handle_payment_action
 from .tasks import start_status_update_task, stop_status_update_task, schedule_daily_tasks
 import os
 import asyncio
@@ -206,8 +206,7 @@ async def main() -> None:
                     MessageHandler(filters.TEXT & ~filters.COMMAND, save_question)
                 ],
                 PAYMENT: [
-                    CallbackQueryHandler(check_payment_status, pattern='check_payment'),
-                    CallbackQueryHandler(cancel_payment, pattern='cancel_payment')
+                    CallbackQueryHandler(handle_payment_action, pattern='^payment:(check|cancel)$')
                 ]
             },
             fallbacks=[CommandHandler('start', auth_start)],

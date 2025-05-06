@@ -196,8 +196,8 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 
                 # 2. Отправляем отдельное сообщение с кнопками управления платежом
                 keyboard = [
-                    [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
-                    [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
+                    [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='payment:check')],
+                    [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='payment:cancel')]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
@@ -248,8 +248,8 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 
                 # 2. Отправляем отдельное сообщение с кнопками управления платежом
                 keyboard = [
-                    [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
-                    [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
+                    [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='payment:check')],
+                    [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='payment:cancel')]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
@@ -296,8 +296,8 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         # 2. Отправляем отдельное сообщение с кнопками управления платежом
         keyboard = [
-            [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
-            [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
+            [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='payment:check')],
+            [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='payment:cancel')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
@@ -368,8 +368,8 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
             
             # Отправляем сообщение о превышении числа попыток
             keyboard = [
-                [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
-                [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
+                [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='payment:check')],
+                [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='payment:cancel')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
@@ -543,8 +543,8 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
     if 'buttons_message_id' not in context.user_data['payment']:
         # Если ID нет в контексте, создаем новое сообщение для кнопок
         keyboard = [
-            [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
-            [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
+            [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='payment:check')],
+            [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='payment:cancel')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         buttons_message = await context.bot.send_message(
@@ -573,8 +573,8 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
         if not status_data:
             # Ошибка при получении статуса
             keyboard = [
-                [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
-                [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
+                [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='payment:check')],
+                [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='payment:cancel')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await context.bot.edit_message_text(
@@ -664,8 +664,8 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
                 f"Платеж еще не начат. Пожалуйста, отсканируйте QR-код и выполните оплату.\n\n"
             )
             keyboard = [
-                [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
-                [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
+                [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='payment:check')],
+                [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='payment:cancel')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
@@ -724,8 +724,8 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
                 f"Пожалуйста, дождитесь завершения операции."
             )
             keyboard = [
-                [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
-                [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
+                [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='payment:check')],
+                [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='payment:cancel')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
@@ -755,8 +755,8 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
                 f"Сообщение: {payment_message}"
             )
             keyboard = [
-                [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
-                [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
+                [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='payment:check')],
+                [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='payment:cancel')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
@@ -781,8 +781,8 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
     except Exception as e:
         logger.error(f"Ошибка при проверке статуса оплаты: {e}")
         keyboard = [
-            [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
-            [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
+            [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='payment:check')],
+            [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='payment:cancel')]
         ]
         
         # Редактируем сообщение с кнопками
@@ -954,4 +954,34 @@ async def update_payment_status(payments_sheet, payment_id: str, new_status: str
         return False
     except Exception as e:
         logging.error(f"Ошибка при обновлении статуса оплаты: {e}")
-        return False 
+        return False
+
+@require_auth
+async def handle_payment_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Обрабатывает действия с платежом (проверка статуса, отмена)
+    
+    Args:
+        update: Объект обновления от Telegram
+        context: Контекст бота
+        
+    Returns:
+        int: Следующее состояние беседы
+    """
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        action = query.data.split(':')[1]
+        
+        if action == 'check':
+            return await check_payment_status(update, context)
+        elif action == 'cancel':
+            return await cancel_payment(update, context)
+        else:
+            logger.warning(f"Неизвестное действие с платежом: {action}")
+            return PAYMENT
+            
+    except Exception as e:
+        logger.error(f"Ошибка при обработке действия с платежом: {e}")
+        return PAYMENT 
