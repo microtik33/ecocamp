@@ -13,7 +13,7 @@ from ..utils.profiler import profile_time
 client = gspread.service_account(filename=config.GOOGLE_CREDENTIALS_FILE)
 
 # Открываем таблицу заказов
-spreadsheet = client.open_by_key(config.ORDERS_SHEET_ID)
+spreadsheet = client.open_by_key(config.ORDERS_SPREADSHEET_ID)
 
 # ID листов
 ORDERS_SHEET_ID = 2082646960
@@ -95,12 +95,12 @@ def get_auth_sheet():
 @profile_time
 def get_menu_sheet():
     """Получение листа меню."""
-    return client.open_by_key(config.MENU_SHEET_ID).get_worksheet_by_id(MENU_SHEET_ID)
+    return client.open_by_key(config.MENU_SPREADSHEET_ID).get_worksheet_by_id(MENU_SHEET_ID)
 
 @profile_time
 def get_composition_sheet():
     """Получение листа с составом блюд."""
-    return client.open_by_key(config.MENU_SHEET_ID).get_worksheet_by_id(COMPOSITION_SHEET_ID)
+    return client.open_by_key(config.MENU_SPREADSHEET_ID).get_worksheet_by_id(COMPOSITION_SHEET_ID)
 
 @profile_time
 def get_questions_sheet():
@@ -833,7 +833,7 @@ def _update_today_menu_cache(force=False):
     if force or not _last_today_menu_update or (current_time - _last_today_menu_update) > _TODAY_MENU_CACHE_TTL:
         try:
             # Получаем листа с меню на сегодня
-            menu_sheet = client.open_by_key(config.MENU_SHEET_ID).get_worksheet_by_id(TODAY_MENU_SHEET_ID)
+            menu_sheet = client.open_by_key(config.MENU_SPREADSHEET_ID).get_worksheet_by_id(TODAY_MENU_SHEET_ID)
             
             if not menu_sheet:
                 logging.error("Не удалось получить лист с меню на сегодня")
