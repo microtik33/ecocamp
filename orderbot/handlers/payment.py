@@ -79,12 +79,11 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     try:
         # Создаем QR-код для оплаты
-        qr_data = sbp.create_qr_code(
-            amount=amount_kopecks,
-            purpose=payment_purpose,
+        qr_data = sbp.register_qr_code(
             account_id=TOCHKA_ACCOUNT_ID,
             merchant_id=TOCHKA_MERCHANT_ID,
-            jwt_token=TOCHKA_JWT_TOKEN
+            amount=amount_kopecks,
+            payment_purpose=payment_purpose
         )
         
         if not qr_data:
