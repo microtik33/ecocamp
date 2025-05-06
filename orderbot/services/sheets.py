@@ -8,7 +8,8 @@ import json
 import os
 import logging
 from ..utils.profiler import profile_time
-from ..services.user import update_user_stats
+from .sheets_client import client, orders_sheet, users_sheet, auth_sheet
+from .user import update_user_stats
 
 # Подключаемся к Google Sheets
 client = gspread.service_account(filename=config.GOOGLE_CREDENTIALS_FILE)
