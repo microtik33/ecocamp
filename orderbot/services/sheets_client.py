@@ -4,7 +4,7 @@ import logging
 
 # Инициализация клиента Google Sheets
 try:
-    client = gspread.service_account_from_dict(config.GOOGLE_CREDENTIALS)
+    client = gspread.service_account(filename=config.GOOGLE_CREDENTIALS_FILE)
     logging.info("Успешное подключение к Google Sheets API")
 except Exception as e:
     logging.error(f"Ошибка при инициализации клиента Google Sheets: {e}")
