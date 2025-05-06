@@ -43,7 +43,7 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Получаем активные заказы пользователя
     orders_sheet = get_orders_sheet()
     all_orders = orders_sheet.get_all_values()
-    user_orders = [order for order in all_orders if order[1] == str(update.effective_user.id) and order[2] in ['Принят', 'Активен', 'Ожидает оплаты']]
+    user_orders = [order for order in all_orders if order[3] == str(update.effective_user.id) and order[2] in ['Принят', 'Активен', 'Ожидает оплаты']]
     
     if not user_orders:
         keyboard = [
