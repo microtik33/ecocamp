@@ -8,6 +8,7 @@ import json
 import os
 import logging
 from ..utils.profiler import profile_time
+from ..services.user import update_user_stats
 
 # Подключаемся к Google Sheets
 client = gspread.service_account(filename=config.GOOGLE_CREDENTIALS_FILE)
@@ -259,6 +260,7 @@ async def update_order_status(order_id: str, row_idx: int, status: str) -> bool:
         logging.error(f"Ошибка при обновлении статуса заказа: {e}")
         return False
 
+@profile_time
 async def save_user_info(user_info: dict):
     """Сохранение информации о пользователе."""
     try:
@@ -307,84 +309,6 @@ async def save_user_info(user_info: dict):
         return True
     except Exception as e:
         logging.error(f"Ошибка при сохранении информации о пользователе: {e}")
-        return False
-
-@profile_time
-async def update_user_stats(user_id: str):
-    """Обновление статистики пользователя."""
-    try:
-        # Получаем все заказы
-        orders_sheet = get_orders_sheet()
-        all_orders = orders_sheet.get_all_values()
-        logging.info(f"Всего заказов в таблице: {len(all_orders)}")
-        
-        # Подсчитываем статистику пользователя
-        active_orders = 0
-        cancelled_orders = 0
-        total_sum = 0
-        last_order_date = None
-        
-        # Создаем словарь для подсчета статусов
-        status_counts = {}
-        
-        for order in all_orders[1:]:  # Пропускаем заголовок
-            if order[3] == user_id:  # User ID в четвертом столбце
-                try:
-                    # Получаем дату заказа
-                    order_date = datetime.strptime(order[1], '%d.%m.%Y %H:%M:%S')
-                    logging.info(f"Обработка заказа {order[0]} от {order[1]} для пользователя {user_id}")
-                except ValueError as e:
-                    logging.error(f"Ошибка парсинга даты заказа {order[1]}: {e}")
-                    continue
-                
-                # Получаем статус и убираем лишние пробелы
-                status = order[2].strip()
-                logging.info(f"Заказ {order[0]}: статус = '{status}'")
-                
-                # Подсчитываем количество каждого статуса
-                status_counts[status] = status_counts.get(status, 0) + 1
-                
-                # Проверяем статус заказа
-                if status in ['Активен', 'Принят', 'Ожидает оплаты', 'Оплачен']:
-                    active_orders += 1
-                    total_sum += float(order[5]) if order[5] else 0
-                    logging.info(f"Заказ {order[0]} со статусом '{status}' учтен в активных заказах")
-                elif status == 'Отменён':
-                    cancelled_orders += 1
-                    logging.info(f"Заказ {order[0]} со статусом '{status}' учтен в отмененных заказах")
-                else:
-                    logging.info(f"Заказ {order[0]} со статусом '{status}' НЕ учтен (неизвестный статус)")
-        
-        # Логируем статистику по статусам
-        logging.info(f"Статистика по статусам заказов для пользователя {user_id}:")
-        for status, count in status_counts.items():
-            logging.info(f"Статус '{status}': {count} заказов")
-        
-        logging.info(f"Итоговая статистика: активных заказов {active_orders}, отмен {cancelled_orders}, сумма {total_sum}")
-        
-        # Получаем текущие данные пользователя
-        users_sheet = get_users_sheet()
-        users_data = users_sheet.get_all_values()
-        user_row = None
-        for idx, row in enumerate(users_data):
-            if row[0] == user_id:
-                user_row = idx + 1
-                break
-        
-        if user_row:
-            # Обновляем статистику пользователя
-            # F-I столбцы (индексы 5-8): Orders Count, Cancellations, Total Sum, Last Order Date
-            users_sheet.update(f'F{user_row}:I{user_row}', 
-                             [[str(active_orders), 
-                               str(cancelled_orders), 
-                               str(int(total_sum)),
-                               last_order_date or '']],
-                             value_input_option='USER_ENTERED')
-            logging.info(f"Обновлена статистика пользователя {user_id}: {active_orders} активных заказов, {cancelled_orders} отмен, сумма {total_sum}, последний заказ от {last_order_date}")
-        
-        return True
-    except Exception as e:
-        logging.error(f"Ошибка при обновлении статистики пользователя: {e}")
         return False
 
 async def get_user_stats(user_id: str):
@@ -675,7 +599,7 @@ async def check_orders_awaiting_payment_at_startup():
                             logging.info(f"Заказ {order[0]} ({meal_type}) не будет обновлен: не соответствует условиям")
                     except ValueError:
                         logging.error(f"Ошибка при парсинге даты выдачи заказа {order[0]}: {delivery_date_str}")
-                        continue
+                    continue
                 else:
                     logging.info(f"Заказ {order[0]} не будет обновлен: отсутствует дата выдачи")
             else:
