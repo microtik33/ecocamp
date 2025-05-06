@@ -332,35 +332,35 @@ async def update_user_stats(user_id: str):
                 try:
                     # Получаем дату заказа
                     order_date = datetime.strptime(order[1], '%d.%m.%Y %H:%M:%S')
-                    logging.info(f"Найден заказ от {order[1]} для пользователя {user_id}")
-                    
-                    # Если это самый новый заказ по дате
-                    if last_order_date is None or order_date > last_order_date:
-                        logging.info(f"Заказ от {order[1]} новее предыдущего {last_order_date}")
-                        last_order_date = order_date
+                    logging.info(f"Обработка заказа {order[0]} от {order[1]} для пользователя {user_id}")
                 except ValueError as e:
                     logging.error(f"Ошибка парсинга даты заказа {order[1]}: {e}")
                     continue
                 
+                # Получаем статус и убираем лишние пробелы
+                status = order[2].strip()
+                logging.info(f"Заказ {order[0]}: статус = '{status}'")
+                
                 # Подсчитываем количество каждого статуса
-                status = order[2]
                 status_counts[status] = status_counts.get(status, 0) + 1
                 
                 # Проверяем статус заказа
-                if status in ['Активен', 'Принят', 'Ожидает оплаты', 'Оплачен']:  # Статус в третьем столбце
+                if status in ['Активен', 'Принят', 'Ожидает оплаты', 'Оплачен']:
                     active_orders += 1
-                    total_sum += float(order[5]) if order[5] else 0  # Сумма в шестом столбце
+                    total_sum += float(order[5]) if order[5] else 0
                     logging.info(f"Заказ {order[0]} со статусом '{status}' учтен в активных заказах")
                 elif status == 'Отменён':
                     cancelled_orders += 1
                     logging.info(f"Заказ {order[0]} со статусом '{status}' учтен в отмененных заказах")
+                else:
+                    logging.info(f"Заказ {order[0]} со статусом '{status}' НЕ учтен (неизвестный статус)")
         
         # Логируем статистику по статусам
         logging.info(f"Статистика по статусам заказов для пользователя {user_id}:")
         for status, count in status_counts.items():
             logging.info(f"Статус '{status}': {count} заказов")
         
-        logging.info(f"Найден последний заказ от {last_order_date}")
+        logging.info(f"Итоговая статистика: активных заказов {active_orders}, отмен {cancelled_orders}, сумма {total_sum}")
         
         # Получаем текущие данные пользователя
         users_sheet = get_users_sheet()
