@@ -339,7 +339,8 @@ async def update_user_stats(user_id: str):
                     logging.error(f"Ошибка парсинга даты заказа {order[1]}: {e}")
                     continue
                 
-                if order[2] == 'Активен':  # Статус в третьем столбце
+                # Проверяем статус заказа
+                if order[2] in ['Активен', 'Принят', 'Ожидает оплаты', 'Оплачен']:  # Статус в третьем столбце
                     active_orders += 1
                     total_sum += float(order[5]) if order[5] else 0  # Сумма в шестом столбце
                 elif order[2] == 'Отменён':
