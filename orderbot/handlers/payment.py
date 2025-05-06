@@ -136,8 +136,14 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         try:
             # 1. Отправляем сообщение с QR-кодом и информацией о платеже
             if 'image' in qr_data and qr_data['image']:
-                # Конвертируем base64 в bytes
-                image_data = base64.b64decode(qr_data['image'])
+                # Проверяем формат изображения
+                if isinstance(qr_data['image'], dict):
+                    # Если изображение пришло в виде словаря, берем данные из него
+                    image_data = base64.b64decode(qr_data['image'].get('data', ''))
+                else:
+                    # Если изображение пришло в виде строки
+                    image_data = base64.b64decode(qr_data['image'])
+                
                 qr_message = await context.bot.send_photo(
                     chat_id=update.effective_chat.id,
                     photo=image_data,
