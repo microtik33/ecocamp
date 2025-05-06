@@ -127,46 +127,77 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         message_text += translations.get_message('payment_instructions')
         
-        # Удаляем старое сообщение
-        await query.delete_message()
-        
-        # 1. Отправляем сообщение с QR-кодом и информацией о платеже
-        qr_message = await context.bot.send_photo(
-            chat_id=update.effective_chat.id,
-            photo=qr_data.get('image', ''),
-            caption=message_text,
-            parse_mode='Markdown'
-        )
-        
-        # 2. Отправляем отдельное сообщение с кнопками управления платежом
-        keyboard = [
-            [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
-            [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        buttons_message = await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Если оплата не подтвердилась автоматически, нажмите на кнопку 'Проверить статус оплаты':",
-            reply_markup=reply_markup
-        )
-        
-        # Сохраняем ID сообщений в хранилище
-        update_payment_message_ids(
-            chat_id=update.effective_chat.id,
-            qr_message_id=qr_message.message_id,
-            buttons_message_id=buttons_message.message_id
-        )
-        
-        # Запускаем автоматическую проверку статуса платежа
         try:
-            auto_check_success = start_auto_check_payment(context, update.effective_chat.id, payment_data)
-            if not auto_check_success:
-                logger.info(f"Не удалось запустить автоматическую проверку платежа при создании")
+            # Удаляем старое сообщение
+            await query.delete_message()
         except Exception as e:
-            logger.error(f"Ошибка при запуске автоматической проверки платежа: {e}")
+            logger.warning(f"Не удалось удалить старое сообщение: {e}")
         
-        return PAYMENT
+        try:
+            # 1. Отправляем сообщение с QR-кодом и информацией о платеже
+            if 'image' in qr_data and qr_data['image']:
+                # Конвертируем base64 в bytes
+                image_data = base64.b64decode(qr_data['image'])
+                qr_message = await context.bot.send_photo(
+                    chat_id=update.effective_chat.id,
+                    photo=image_data,
+                    caption=message_text,
+                    parse_mode='Markdown'
+                )
+            else:
+                # Если нет изображения, отправляем только текст
+                qr_message = await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=message_text,
+                    parse_mode='Markdown'
+                )
+            
+            # 2. Отправляем отдельное сообщение с кнопками управления платежом
+            keyboard = [
+                [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
+                [InlineKeyboardButton(translations.get_button('cancel_payment'), callback_data='cancel_payment')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            buttons_message = await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Если оплата не подтвердилась автоматически, нажмите на кнопку 'Проверить статус оплаты':",
+                reply_markup=reply_markup
+            )
+            
+            # Сохраняем ID сообщений в хранилище
+            update_payment_message_ids(
+                chat_id=update.effective_chat.id,
+                qr_message_id=qr_message.message_id,
+                buttons_message_id=buttons_message.message_id
+            )
+            
+            # Запускаем автоматическую проверку статуса платежа
+            try:
+                auto_check_success = start_auto_check_payment(context, update.effective_chat.id, payment_data)
+                if not auto_check_success:
+                    logger.info(f"Не удалось запустить автоматическую проверку платежа при создании")
+            except Exception as e:
+                logger.error(f"Ошибка при запуске автоматической проверки платежа: {e}")
+            
+            return PAYMENT
+            
+        except Exception as e:
+            logger.error(f"Ошибка при отправке сообщений: {e}")
+            # Отправляем сообщение об ошибке
+            keyboard = [
+                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            try:
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=translations.get_message('payment_error'),
+                    reply_markup=reply_markup
+                )
+            except Exception as send_error:
+                logger.error(f"Не удалось отправить сообщение об ошибке: {send_error}")
+            return MENU
         
     except Exception as e:
         logger.error(f"Ошибка при создании платежа: {e}")
