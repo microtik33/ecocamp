@@ -998,7 +998,7 @@ async def save_payment_info(user_id: str, amount: float, status: str = "ожид
     Args:
         user_id: ID пользователя
         amount: Сумма оплаты
-        status: Статус оплаты (ожидает, оплачено, отменено)
+        status: Статус оплаты (ожидает, оплачено, отменено, отклонено)
         
     Returns:
         bool: True в случае успешного сохранения, False в противном случае

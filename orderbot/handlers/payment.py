@@ -462,7 +462,7 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
             
             # Обновляем статус оплаты в таблице
             payments_sheet = get_payments_sheet()
-            await update_payment_status(payments_sheet, user_data['payment'].get('payment_id', ''), "отменено")
+            await update_payment_status(payments_sheet, user_data['payment'].get('payment_id', ''), "отклонено")
             
             keyboard = [
                 [InlineKeyboardButton(translations.get_button('pay_orders'), callback_data='pay_orders')],
@@ -701,7 +701,7 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             
             # Обновляем статус оплаты в таблице
             payments_sheet = get_payments_sheet()
-            await update_payment_status(payments_sheet, context.user_data['payment'].get('payment_id', ''), "отменено")
+            await update_payment_status(payments_sheet, context.user_data['payment'].get('payment_id', ''), "отклонено")
             
             keyboard = [
                 [InlineKeyboardButton(translations.get_button('pay_orders'), callback_data='pay_orders')],
@@ -868,7 +868,7 @@ async def cancel_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Обновляем статус оплаты в таблице
     if 'payment' in context.user_data and 'payment_id' in context.user_data['payment']:
         payments_sheet = get_payments_sheet()
-        await update_payment_status(payments_sheet, context.user_data['payment']['payment_id'], "отменено")
+        await update_payment_status(payments_sheet, context.user_data['payment']['payment_id'], "отклонено")
     
     # Останавливаем автоматическую проверку, если job_queue доступен
     if context.job_queue:
