@@ -24,7 +24,7 @@ PAYMENT_CHECK_INTERVAL = 10
 PAYMENT_MAX_CHECKS = 12  # 2 минуты максимум (12 * 10 секунд)
 
 # Максимальное число попыток проверки статуса
-MAX_STATUS_CHECKS = 10
+MAX_STATUS_CHECKS = 20
 # Интервал между проверками в секундах
 STATUS_CHECK_INTERVAL = 15
 
@@ -665,7 +665,6 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             # Платеж еще не начат
             message_text = (
                 f"Платеж еще не начат. Пожалуйста, отсканируйте QR-код и выполните оплату.\n\n"
-                f"Статус: {payment_message}"
             )
             keyboard = [
                 [InlineKeyboardButton(translations.get_button('check_payment'), callback_data='check_payment')],
@@ -725,7 +724,6 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             # Платеж в процессе
             message_text = (
                 f"Платеж обрабатывается банком.\n"
-                f"Статус: {payment_message}\n\n"
                 f"Пожалуйста, дождитесь завершения операции."
             )
             keyboard = [
