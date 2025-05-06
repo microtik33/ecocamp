@@ -1,6 +1,6 @@
 import gspread
 from .. import config
-from .sheets_client import client, orders_sheet, users_sheet, auth_sheet
+from .sheets import client, orders_sheet, users_sheet, auth_sheet
 from datetime import datetime
 import logging
 

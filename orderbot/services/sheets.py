@@ -8,8 +8,6 @@ import json
 import os
 import logging
 from ..utils.profiler import profile_time
-from .sheets_client import client, orders_sheet, users_sheet, auth_sheet
-from .user import update_user_stats
 
 # Подключаемся к Google Sheets
 client = gspread.service_account(filename=config.GOOGLE_CREDENTIALS_FILE)
@@ -261,7 +259,6 @@ async def update_order_status(order_id: str, row_idx: int, status: str) -> bool:
         logging.error(f"Ошибка при обновлении статуса заказа: {e}")
         return False
 
-@profile_time
 async def save_user_info(user_info: dict):
     """Сохранение информации о пользователе."""
     try:
@@ -600,7 +597,7 @@ async def check_orders_awaiting_payment_at_startup():
                             logging.info(f"Заказ {order[0]} ({meal_type}) не будет обновлен: не соответствует условиям")
                     except ValueError:
                         logging.error(f"Ошибка при парсинге даты выдачи заказа {order[0]}: {delivery_date_str}")
-                    continue
+                        continue
                 else:
                     logging.info(f"Заказ {order[0]} не будет обновлен: отсутствует дата выдачи")
             else:

@@ -7,7 +7,7 @@ from .. import translations
 from ..services import sheets
 from ..services.sheets import (
     orders_sheet, get_dishes_for_meal, get_next_order_id, 
-    update_user_stats, save_order, update_order, is_user_authorized
+    save_order, update_order, is_user_authorized
 )
 from ..services.user import update_user_info, update_user_stats
 from ..utils.time_utils import is_order_time
