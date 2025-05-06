@@ -868,7 +868,7 @@ async def cancel_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Обновляем статус оплаты в таблице
     if 'payment' in context.user_data and 'payment_id' in context.user_data['payment']:
         payments_sheet = get_payments_sheet()
-        await update_payment_status(payments_sheet, context.user_data['payment']['payment_id'], "отклонено")
+        await update_payment_status(payments_sheet, context.user_data['payment']['payment_id'], "отменено")
     
     # Останавливаем автоматическую проверку, если job_queue доступен
     if context.job_queue:
