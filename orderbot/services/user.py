@@ -125,6 +125,9 @@ async def update_user_stats(user_id: str):
         total_sum = 0
         last_order_date = None
         
+        # Создаем словарь для подсчета статусов
+        status_counts = {}
+        
         for order in all_orders[1:]:  # Пропускаем заголовок
             if order[3] == user_id:  # User ID в четвертом столбце
                 try:
@@ -139,11 +142,28 @@ async def update_user_stats(user_id: str):
                     logging.error(f"Ошибка при парсинге даты заказа {order[1]}: {e}")
                     continue
                 
-                if order[2] in ['Активен', 'Принят']:  # Учитываем активные и принятые заказы
+                # Получаем статус и убираем лишние пробелы
+                status = order[2].strip()
+                logging.info(f"Заказ {order[0]}: статус = '{status}'")
+                
+                # Подсчитываем количество каждого статуса
+                status_counts[status] = status_counts.get(status, 0) + 1
+                
+                # Проверяем статус заказа
+                if status in ['Активен', 'Принят', 'Ожидает оплаты', 'Оплачен']:
                     active_orders += 1
                     total_sum += float(order[5]) if order[5] else 0  # Сумма в шестом столбце
-                elif order[2] == 'Отменён':
+                    logging.info(f"Заказ {order[0]} со статусом '{status}' учтен в активных заказах")
+                elif status == 'Отменён':
                     cancelled_orders += 1
+                    logging.info(f"Заказ {order[0]} со статусом '{status}' учтен в отмененных заказах")
+                else:
+                    logging.info(f"Заказ {order[0]} со статусом '{status}' НЕ учтен (неизвестный статус)")
+        
+        # Логируем статистику по статусам
+        logging.info(f"Статистика по статусам заказов для пользователя {user_id}:")
+        for status, count in status_counts.items():
+            logging.info(f"Статус '{status}': {count} заказов")
         
         # Получаем текущие данные пользователя
         users_data = users_sheet.get_all_values()
