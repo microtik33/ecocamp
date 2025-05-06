@@ -136,20 +136,48 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         try:
             # 1. Отправляем сообщение с QR-кодом и информацией о платеже
             if 'image' in qr_data and qr_data['image']:
-                # Проверяем формат изображения
-                if isinstance(qr_data['image'], dict):
-                    # Если изображение пришло в виде словаря, берем данные из него
-                    image_data = base64.b64decode(qr_data['image'].get('data', ''))
-                else:
-                    # Если изображение пришло в виде строки
-                    image_data = base64.b64decode(qr_data['image'])
-                
-                qr_message = await context.bot.send_photo(
-                    chat_id=update.effective_chat.id,
-                    photo=image_data,
-                    caption=message_text,
-                    parse_mode='Markdown'
-                )
+                try:
+                    # Проверяем формат изображения
+                    if isinstance(qr_data['image'], dict):
+                        # Если изображение пришло в виде словаря, берем данные из него
+                        image_data = qr_data['image'].get('data', '')
+                        if not image_data:
+                            logger.error("Получены пустые данные изображения из словаря")
+                            raise ValueError("Empty image data")
+                    else:
+                        # Если изображение пришло в виде строки
+                        image_data = qr_data['image']
+                        if not image_data:
+                            logger.error("Получена пустая строка изображения")
+                            raise ValueError("Empty image string")
+                    
+                    # Декодируем base64
+                    try:
+                        image_bytes = base64.b64decode(image_data)
+                        if not image_bytes:
+                            logger.error("Декодированные данные изображения пусты")
+                            raise ValueError("Empty decoded image data")
+                    except Exception as e:
+                        logger.error(f"Ошибка при декодировании base64: {e}")
+                        raise
+                    
+                    # Логируем размер изображения для отладки
+                    logger.info(f"Размер декодированного изображения: {len(image_bytes)} байт")
+                    
+                    qr_message = await context.bot.send_photo(
+                        chat_id=update.effective_chat.id,
+                        photo=image_bytes,
+                        caption=message_text,
+                        parse_mode='Markdown'
+                    )
+                except Exception as e:
+                    logger.error(f"Ошибка при обработке изображения: {e}")
+                    # Если не удалось отправить фото, отправляем только текст
+                    qr_message = await context.bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text=message_text,
+                        parse_mode='Markdown'
+                    )
             else:
                 # Если нет изображения, отправляем только текст
                 qr_message = await context.bot.send_message(
