@@ -101,7 +101,6 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         payment_id = await save_payment_info(
             user_id=update.effective_user.id,
             amount=total_sum,
-            qrc_id=qr_data.get('qrc_id', ''),
             status='создан'
         )
         
