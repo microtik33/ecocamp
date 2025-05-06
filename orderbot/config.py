@@ -47,9 +47,6 @@ GOOGLE_SHEETS_SCOPE = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
-# Уникальные идентификаторы Google таблиц (не зависят от имени таблицы)
-MENU_SHEET_ID = os.environ.get('MENU_SHEET_ID')
-ORDERS_SHEET_ID = os.environ.get('ORDERS_SHEET_ID')
 
 # Настройки для API Точка Банка
 TOCHKA_JWT_TOKEN = os.environ.get('TOCHKA_JWT_TOKEN')
