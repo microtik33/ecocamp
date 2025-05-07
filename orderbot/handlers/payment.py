@@ -350,6 +350,15 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
         if 'payment' not in user_data or 'qrc_id' not in user_data['payment']:
             # Платеж не найден, отменяем задачу
             logger.info(f"Автопроверка: данные о платеже не найдены")
+            # Останавливаем задачу автопроверки
+            try:
+                job_name = f"payment_check_{chat_id}"
+                current_jobs = context.job_queue.get_jobs_by_name(job_name)
+                for job in current_jobs:
+                    job.schedule_removal()
+                logger.info(f"Автопроверка: задача остановлена из-за отсутствия данных о платеже")
+            except Exception as e:
+                logger.error(f"Ошибка при остановке задачи автопроверки: {e}")
             return
         
         # Увеличиваем счетчик проверок
@@ -636,6 +645,9 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             if 'payment' in context.user_data:
                 del context.user_data['payment']
             
+            # Останавливаем автоматическую проверку статуса платежа
+            stop_auto_check_payment(context, update.effective_chat.id)
+            
             return MENU
             
         elif payment_status == 'expired':
@@ -655,6 +667,9 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             # Очищаем данные о платеже
             if 'payment' in context.user_data:
                 del context.user_data['payment']
+            
+            # Останавливаем автоматическую проверку статуса платежа
+            stop_auto_check_payment(context, update.effective_chat.id)
             
             return MENU
         
@@ -715,6 +730,9 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             if 'payment' in context.user_data:
                 del context.user_data['payment']
                 
+            # Останавливаем автоматическую проверку статуса платежа
+            stop_auto_check_payment(context, update.effective_chat.id)
+            
             return MENU
         
         elif payment_status == 'pending':
@@ -845,6 +863,38 @@ def start_auto_check_payment(context, chat_id, user_data):
         logger.error(f"Ошибка при настройке автоматической проверки статуса: {e}")
         return False
 
+def stop_auto_check_payment(context, chat_id):
+    """
+    Останавливает автоматическую проверку статуса платежа
+    
+    Args:
+        context: Контекст бота
+        chat_id: ID чата
+        
+    Returns:
+        bool: True если задача успешно остановлена, False в противном случае
+    """
+    # Проверяем, доступна ли job_queue в контексте
+    if not context.job_queue:
+        logger.warning(f"job_queue недоступен в контексте, невозможно остановить автопроверку для chat_id={chat_id}")
+        return False
+        
+    try:
+        job_name = f"payment_check_{chat_id}"
+        current_jobs = context.job_queue.get_jobs_by_name(job_name)
+        if not current_jobs:
+            logger.info(f"Нет активных задач автопроверки для chat_id={chat_id}")
+            return True
+            
+        for job in current_jobs:
+            job.schedule_removal()
+        
+        logger.info(f"Остановлена автоматическая проверка статуса платежа для chat_id={chat_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка при остановке автоматической проверки статуса: {e}")
+        return False
+
 @require_auth
 async def cancel_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
@@ -872,6 +922,9 @@ async def cancel_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             reply_markup=reply_markup
         )
         return MENU
+    
+    # Останавливаем автоматическую проверку статуса платежа
+    stop_auto_check_payment(context, update.effective_chat.id)
     
     # Обновляем статус оплаты в таблице
     payments_sheet = get_payments_sheet()
