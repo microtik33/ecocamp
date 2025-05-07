@@ -221,6 +221,7 @@ async def main() -> None:
         application.add_handler(CallbackQueryHandler(show_tomorrow_menu, pattern='tomorrow_menu'))
         application.add_handler(CallbackQueryHandler(show_dish_compositions, pattern='show_compositions'))
         application.add_handler(CallbackQueryHandler(back_to_main_menu, pattern='back_to_menu'))
+        application.add_handler(CallbackQueryHandler(handle_payment_action, pattern='^payment:(check|cancel)$'))
         
         # Запуск планировщика задач
         asyncio.create_task(schedule_daily_tasks())
