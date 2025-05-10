@@ -383,13 +383,26 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             # Обновляем сообщение с кнопками
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=buttons_message_id,
-                text="Автоматическая проверка завершена. Нажмите кнопку для ручной проверки статуса.",
-                reply_markup=reply_markup
-            )
+            try:
+                await context.bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=buttons_message_id,
+                    text="Автоматическая проверка завершена. Нажмите кнопку для ручной проверки статуса.",
+                    reply_markup=reply_markup
+                )
+            except Exception as e:
+                logger.error(f"Ошибка при автоматической проверке статуса оплаты: {e}")
             
+            # Останавливаем задачу автопроверки - ВАЖНО!
+            try:
+                job_name = f"payment_check_{chat_id}"
+                current_jobs = context.job_queue.get_jobs_by_name(job_name)
+                for job in current_jobs:
+                    job.schedule_removal()
+                logger.info(f"Автопроверка: задача остановлена после достижения максимального числа попыток")
+            except Exception as e:
+                logger.error(f"Ошибка при остановке задачи автопроверки: {e}")
+                
             # Отменяем задачу
             return
         
@@ -409,6 +422,59 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
         
         logger.info(f"Автопроверка: статус платежа {payment_status}, сообщение: {payment_message}")
         
+        # Проверяем время жизни QR-кода (обычно 5 минут = 300 секунд)
+        # Если прошло больше 5 минут с момента создания и статус все еще notstarted,
+        # считаем QR-код истекшим и завершаем проверку
+        if payment_status == 'notstarted' and 'created_at' in user_data['payment']:
+            try:
+                created_at = datetime.fromisoformat(user_data['payment']['created_at'])
+                now = datetime.now()
+                delta = now - created_at
+                
+                # Проверяем, прошло ли 5 минут (300 секунд) с момента создания QR-кода
+                if delta.total_seconds() > 300:
+                    logger.info(f"Автопроверка: QR-код истек по времени (прошло {delta.total_seconds()} секунд)")
+                    
+                    # Обновляем статус оплаты в таблице
+                    payments_sheet = get_payments_sheet()
+                    await update_payment_status(payments_sheet, user_data['payment'].get('payment_id', ''), "истек срок")
+                    
+                    # Отправляем сообщение об истечении срока
+                    keyboard = [
+                        [InlineKeyboardButton(translations.get_button('pay_orders'), callback_data='pay_orders')],
+                        [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')]
+                    ]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    try:
+                        await context.bot.edit_message_text(
+                            chat_id=chat_id,
+                            message_id=buttons_message_id,
+                            text=translations.get_message('payment_expired'),
+                            reply_markup=reply_markup
+                        )
+                    except Exception as e:
+                        logger.error(f"Ошибка при обновлении сообщения об истечении срока QR-кода: {e}")
+                    
+                    # Останавливаем задачу автопроверки
+                    try:
+                        job_name = f"payment_check_{chat_id}"
+                        current_jobs = context.job_queue.get_jobs_by_name(job_name)
+                        for job in current_jobs:
+                            job.schedule_removal()
+                        logger.info(f"Автопроверка: задача остановлена, QR-код истек по времени")
+                    except Exception as e:
+                        logger.error(f"Ошибка при остановке задачи автопроверки: {e}")
+                    
+                    # Очищаем данные о платеже
+                    if 'payment' in user_data:
+                        del user_data['payment']
+                    
+                    # Отменяем задачу
+                    return
+            except Exception as e:
+                logger.error(f"Ошибка при проверке времени жизни QR-кода: {e}")
+            
         if payment_status == 'accepted':
             # Оплата успешна, обновляем статусы заказов
             orders_sheet = get_orders_sheet()
@@ -444,12 +510,25 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             # Обновляем сообщение с кнопками
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=buttons_message_id,
-                text=translations.get_message('payment_success'),
-                reply_markup=reply_markup
-            )
+            try:
+                await context.bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=buttons_message_id,
+                    text=translations.get_message('payment_success'),
+                    reply_markup=reply_markup
+                )
+            except Exception as e:
+                logger.error(f"Ошибка при обновлении сообщения об успешной оплате: {e}")
+            
+            # Останавливаем задачу автопроверки
+            try:
+                job_name = f"payment_check_{chat_id}"
+                current_jobs = context.job_queue.get_jobs_by_name(job_name)
+                for job in current_jobs:
+                    job.schedule_removal()
+                logger.info(f"Автопроверка: задача остановлена, платеж успешно выполнен")
+            except Exception as e:
+                logger.error(f"Ошибка при остановке задачи автопроверки: {e}")
             
             # Очищаем данные о платеже
             if 'payment' in user_data:
@@ -477,12 +556,25 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             # Обновляем сообщение с кнопками
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=buttons_message_id,
-                text=message_text,
-                reply_markup=reply_markup
-            )
+            try:
+                await context.bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=buttons_message_id,
+                    text=message_text,
+                    reply_markup=reply_markup
+                )
+            except Exception as e:
+                logger.error(f"Ошибка при обновлении сообщения об отклонении платежа: {e}")
+            
+            # Останавливаем задачу автопроверки
+            try:
+                job_name = f"payment_check_{chat_id}"
+                current_jobs = context.job_queue.get_jobs_by_name(job_name)
+                for job in current_jobs:
+                    job.schedule_removal()
+                logger.info(f"Автопроверка: задача остановлена, платеж отклонен")
+            except Exception as e:
+                logger.error(f"Ошибка при остановке задачи автопроверки: {e}")
             
             # Очищаем данные о платеже
             if 'payment' in user_data:
@@ -500,12 +592,25 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             # Обновляем сообщение с кнопками
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=buttons_message_id,
-                text=translations.get_message('payment_expired'),
-                reply_markup=reply_markup
-            )
+            try:
+                await context.bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=buttons_message_id,
+                    text=translations.get_message('payment_expired'),
+                    reply_markup=reply_markup
+                )
+            except Exception as e:
+                logger.error(f"Ошибка при обновлении сообщения об истечении срока QR-кода: {e}")
+            
+            # Останавливаем задачу автопроверки
+            try:
+                job_name = f"payment_check_{chat_id}"
+                current_jobs = context.job_queue.get_jobs_by_name(job_name)
+                for job in current_jobs:
+                    job.schedule_removal()
+                logger.info(f"Автопроверка: задача остановлена, QR-код истек")
+            except Exception as e:
+                logger.error(f"Ошибка при остановке задачи автопроверки: {e}")
             
             # Очищаем данные о платеже
             if 'payment' in user_data:
@@ -513,12 +618,13 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
             
             # Отменяем задачу
             return
-        
-        # Для других статусов просто ждем, не обновляем сообщение
-        # Состояние обновится при следующей попытке или пользователь может проверить вручную
+            
+        # Для других статусов (pending, notstarted и т.д.) просто продолжаем проверку
+        # Не перезапускаем check_payment, продолжаем текущий цикл проверки
             
     except Exception as e:
         logger.error(f"Ошибка при автоматической проверке статуса оплаты: {e}")
+        # При ошибке просто продолжаем, следующая проверка будет по расписанию
 
 @require_auth
 async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -634,16 +740,16 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
                 [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await context.bot.edit_message_text(
-                chat_id=update.effective_chat.id,
-                message_id=buttons_message_id,
-                text=translations.get_message('payment_success'),
-                reply_markup=reply_markup
-            )
             
-            # Очищаем данные о платеже
-            if 'payment' in context.user_data:
-                del context.user_data['payment']
+            try:
+                await context.bot.edit_message_text(
+                    chat_id=update.effective_chat.id,
+                    message_id=buttons_message_id,
+                    text=translations.get_message('payment_success'),
+                    reply_markup=reply_markup
+                )
+            except Exception as e:
+                logger.error(f"Ошибка при обновлении сообщения об успешной оплате: {e}")
             
             # Останавливаем автоматическую проверку статуса платежа
             stop_auto_check_payment(context, update.effective_chat.id)
@@ -657,17 +763,21 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
                 [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await context.bot.edit_message_text(
-                chat_id=update.effective_chat.id,
-                message_id=buttons_message_id,
-                text=translations.get_message('payment_expired'),
-                reply_markup=reply_markup
-            )
+            
+            try:
+                await context.bot.edit_message_text(
+                    chat_id=update.effective_chat.id,
+                    message_id=buttons_message_id,
+                    text=translations.get_message('payment_expired'),
+                    reply_markup=reply_markup
+                )
+            except Exception as e:
+                logger.error(f"Ошибка при обновлении сообщения об истечении срока QR-кода: {e}")
             
             # Очищаем данные о платеже
             if 'payment' in context.user_data:
                 del context.user_data['payment']
-            
+                
             # Останавливаем автоматическую проверку статуса платежа
             stop_auto_check_payment(context, update.effective_chat.id)
             
@@ -693,9 +803,17 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             
             # Пробуем запустить автоматическую проверку, если job_queue доступен
             try:
-                auto_check_success = start_auto_check_payment(context, update.effective_chat.id, context.user_data)
-                if not auto_check_success:
-                    logger.info("Автоматическая проверка не запущена. Пользователь должен проверить статус вручную.")
+                # Проверяем, не запущена ли уже задача автопроверки
+                job_name = f"payment_check_{update.effective_chat.id}"
+                current_jobs = context.job_queue.get_jobs_by_name(job_name)
+                
+                if not current_jobs:
+                    # Задача не запущена, запускаем новую
+                    auto_check_success = start_auto_check_payment(context, update.effective_chat.id, context.user_data)
+                    if not auto_check_success:
+                        logger.info("Автоматическая проверка не запущена. Пользователь должен проверить статус вручную.")
+                else:
+                    logger.info(f"Задача автопроверки уже запущена для chat_id={update.effective_chat.id}, не запускаем повторно")
             except Exception as e:
                 logger.warning(f"Не удалось запустить автоматическую проверку: {e}")
                 # При ошибке просто продолжаем, пользователь может проверить статус вручную
@@ -719,17 +837,17 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
                 [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await context.bot.edit_message_text(
-                chat_id=update.effective_chat.id,
-                message_id=buttons_message_id,
-                text=message_text,
-                reply_markup=reply_markup
-            )
             
-            # Очищаем данные о платеже
-            if 'payment' in context.user_data:
-                del context.user_data['payment']
-                
+            try:
+                await context.bot.edit_message_text(
+                    chat_id=update.effective_chat.id,
+                    message_id=buttons_message_id,
+                    text=message_text,
+                    reply_markup=reply_markup
+                )
+            except Exception as e:
+                logger.error(f"Ошибка при обновлении сообщения об отклонении платежа: {e}")
+            
             # Останавливаем автоматическую проверку статуса платежа
             stop_auto_check_payment(context, update.effective_chat.id)
             
@@ -756,9 +874,17 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             
             # Пробуем запустить автоматическую проверку, если job_queue доступен
             try:
-                auto_check_success = start_auto_check_payment(context, update.effective_chat.id, context.user_data)
-                if not auto_check_success:
-                    logger.info("Автоматическая проверка не запущена. Пользователь должен проверить статус вручную.")
+                # Проверяем, не запущена ли уже задача автопроверки
+                job_name = f"payment_check_{update.effective_chat.id}"
+                current_jobs = context.job_queue.get_jobs_by_name(job_name)
+                
+                if not current_jobs:
+                    # Задача не запущена, запускаем новую
+                    auto_check_success = start_auto_check_payment(context, update.effective_chat.id, context.user_data)
+                    if not auto_check_success:
+                        logger.info("Автоматическая проверка не запущена. Пользователь должен проверить статус вручную.")
+                else:
+                    logger.info(f"Задача автопроверки уже запущена для chat_id={update.effective_chat.id}, не запускаем повторно")
             except Exception as e:
                 logger.warning(f"Не удалось запустить автоматическую проверку: {e}")
                 # При ошибке просто продолжаем, пользователь может проверить статус вручную
@@ -787,9 +913,17 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             
             # Пробуем запустить автоматическую проверку, если job_queue доступен
             try:
-                auto_check_success = start_auto_check_payment(context, update.effective_chat.id, context.user_data)
-                if not auto_check_success:
-                    logger.info("Автоматическая проверка не запущена. Пользователь должен проверить статус вручную.")
+                # Проверяем, не запущена ли уже задача автопроверки
+                job_name = f"payment_check_{update.effective_chat.id}"
+                current_jobs = context.job_queue.get_jobs_by_name(job_name)
+                
+                if not current_jobs:
+                    # Задача не запущена, запускаем новую
+                    auto_check_success = start_auto_check_payment(context, update.effective_chat.id, context.user_data)
+                    if not auto_check_success:
+                        logger.info("Автоматическая проверка не запущена. Пользователь должен проверить статус вручную.")
+                else:
+                    logger.info(f"Задача автопроверки уже запущена для chat_id={update.effective_chat.id}, не запускаем повторно")
             except Exception as e:
                 logger.warning(f"Не удалось запустить автоматическую проверку: {e}")
                 # При ошибке просто продолжаем, пользователь может проверить статус вручную
@@ -927,8 +1061,12 @@ async def cancel_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     stop_auto_check_payment(context, update.effective_chat.id)
     
     # Обновляем статус оплаты в таблице
-    payments_sheet = get_payments_sheet()
-    await update_payment_status(payments_sheet, context.user_data['payment'].get('payment_id', ''), "отменено")
+    try:
+        payments_sheet = get_payments_sheet()
+        await update_payment_status(payments_sheet, context.user_data['payment'].get('payment_id', ''), "отменено")
+        logger.info(f"Статус платежа {context.user_data['payment'].get('payment_id', '')} обновлен на 'отменено'")
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении статуса оплаты в таблице: {e}")
     
     # Удаляем сообщение с QR-кодом, если оно есть
     try:
@@ -950,33 +1088,50 @@ async def cancel_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     # Обновляем сообщение с кнопками или отправляем новое
-    if 'buttons_message_id' in context.user_data['payment']:
-        try:
-            await context.bot.edit_message_text(
-                chat_id=update.effective_chat.id,
-                message_id=context.user_data['payment']['buttons_message_id'],
-                text=translations.get_message('payment_cancel'),
-                reply_markup=reply_markup
-            )
-        except Exception as e:
-            logger.warning(f"Не удалось обновить сообщение с кнопками: {e}")
-            # Если не удалось обновить, отправляем новое сообщение
+    try:
+        if 'buttons_message_id' in context.user_data['payment']:
+            try:
+                await context.bot.edit_message_text(
+                    chat_id=update.effective_chat.id,
+                    message_id=context.user_data['payment']['buttons_message_id'],
+                    text=translations.get_message('payment_cancel'),
+                    reply_markup=reply_markup
+                )
+                logger.info(f"Сообщение об отмене платежа успешно отображено")
+            except telegram.error.BadRequest as e:
+                if "Message is not modified" in str(e):
+                    # Если сообщение не изменилось, просто логируем и продолжаем
+                    logger.warning(f"Сообщение с кнопками не изменилось: {e}")
+                else:
+                    # Если другая ошибка, пробуем отправить новое сообщение
+                    logger.warning(f"Не удалось обновить сообщение с кнопками: {e}")
+                    await context.bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text=translations.get_message('payment_cancel'),
+                        reply_markup=reply_markup
+                    )
+            except Exception as e:
+                logger.warning(f"Не удалось обновить сообщение с кнопками: {e}")
+                # Если не удалось обновить, отправляем новое сообщение
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=translations.get_message('payment_cancel'),
+                    reply_markup=reply_markup
+                )
+        else:
+            # Если ID сообщения не найден, отправляем новое
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
                 text=translations.get_message('payment_cancel'),
                 reply_markup=reply_markup
             )
-    else:
-        # Если ID сообщения не найден, отправляем новое
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=translations.get_message('payment_cancel'),
-            reply_markup=reply_markup
-        )
+    except Exception as e:
+        logger.error(f"Ошибка при отправке сообщения об отмене платежа: {e}")
     
     # Очищаем данные о платеже
     if 'payment' in context.user_data:
         del context.user_data['payment']
+        logger.info(f"Данные о платеже удалены из контекста пользователя")
     
     return MENU
 
