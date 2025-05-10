@@ -99,7 +99,7 @@ def register_qr_code(account_id: str, merchant_id: str, amount: int,
                     "mediaType": "image/png"
                 },
                 "sourceName": "EcoCamp Bot",
-                "ttl": 30  # Время жизни QR-кода - 30 минут
+                "ttl": 10  # Время жизни QR-кода - 10 минут
             }
         }
         

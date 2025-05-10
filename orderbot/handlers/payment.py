@@ -431,8 +431,8 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
                 now = datetime.now()
                 delta = now - created_at
                 
-                # Проверяем, прошло ли 5 минут (300 секунд) с момента создания QR-кода
-                if delta.total_seconds() > 300:
+                # Проверяем, прошло ли 10 минут (600 секунд) с момента создания QR-кода
+                if delta.total_seconds() > 600:
                     logger.info(f"Автопроверка: QR-код истек по времени (прошло {delta.total_seconds()} секунд)")
                     
                     # Обновляем статус оплаты в таблице
