@@ -790,7 +790,7 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
                 escaped_meal_type = escape_markdown_v2(meal_type_with_date)
                 
                 order_info = (
-                    f"💰 Заказ *{escaped_order_id}* \\({escaped_status}\\)\n"
+                    f"💸 Заказ *{escaped_order_id}* \\({escaped_status}\\)\n"
                     f"🍽 Время: {escaped_meal_type}\n"
                 )           
                 order_sum = int(float(order[5])) if order[5] else 0
@@ -850,7 +850,7 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
                 messages.append(current_message)
                 current_message = ""
             
-            messages.append(escape_markdown_v2("Ваши активные заказы:"))
+            messages.append(escape_markdown_v2("Ваши заказы на завтра:"))
             for order in active_orders:
                 # Формируем информацию о заказе
                 delivery_date = order[11] if order[11] else None
