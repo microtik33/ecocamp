@@ -89,8 +89,8 @@ def get_auth_sheet():
     try:
         return spreadsheet.get_worksheet_by_id(AUTH_SHEET_ID)
     except gspread.WorksheetNotFound:
-        sheet = spreadsheet.add_worksheet("Auth", 1000, 3)
-        sheet.update('A1:C1', [['Phone Number', 'Room Number', 'User ID']])
+        sheet = spreadsheet.add_worksheet("Auth", 1000, 4)
+        sheet.update('A1:D1', [['Name', 'Phone Number', 'Room Number', 'User ID']])
         return sheet
 
 @profile_time
@@ -719,8 +719,8 @@ def is_user_authorized(user_id: str) -> bool:
         bool: True если пользователь авторизован, False в противном случае
     """
     try:
-        # Получаем все значения из столбца B (user_id)
-        user_ids = get_auth_sheet().col_values(3)
+        # Получаем все значения из столбца D (user_id)
+        user_ids = get_auth_sheet().col_values(4)
         return str(user_id) in user_ids
     except Exception as e:
         logging.error(f"Ошибка при проверке авторизации пользователя: {e}")
@@ -729,8 +729,8 @@ def is_user_authorized(user_id: str) -> bool:
 def check_phone(phone: str) -> bool:
     """Проверка наличия телефона в базе."""
     try:
-        # Получаем все значения из столбца A (телефоны)
-        phones = get_auth_sheet().col_values(1)
+        # Получаем все значения из столбца B (телефоны)
+        phones = get_auth_sheet().col_values(2)
         return phone in phones
     except Exception as e:
         logging.error(f"Ошибка при проверке телефона: {e}")
@@ -739,12 +739,12 @@ def check_phone(phone: str) -> bool:
 def save_user_id(phone: str, user_id: str) -> bool:
     """Сохранение user_id рядом с телефоном."""
     try:
-        # Получаем все значения из столбца A (телефоны)
-        phones = get_auth_sheet().col_values(1)
+        # Получаем все значения из столбца B (телефоны)
+        phones = get_auth_sheet().col_values(2)
         # Ищем индекс строки с нужным телефоном
         row_idx = phones.index(phone) + 1  # +1 потому что в gspread строки начинаются с 1
-        # Обновляем ячейку с user_id (столбец C)
-        get_auth_sheet().update_cell(row_idx, 3, user_id)
+        # Обновляем ячейку с user_id (столбец D)
+        get_auth_sheet().update_cell(row_idx, 4, user_id)
         return True
     except Exception as e:
         logging.error(f"Ошибка при сохранении user_id: {e}")

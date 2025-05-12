@@ -35,17 +35,20 @@ async def update_user_info(user):
             ], value_input_option='USER_ENTERED')
             all_users = users_sheet.get_all_values()
         
-        # Получаем номер телефона из таблицы Auth
+        # Получаем номер телефона и номер комнаты из таблицы Auth
         phone = ''
+        room_number = ''
         try:
             # Получаем все значения из столбцов таблицы Auth
             auth_data = auth_sheet.get_all_values()
             for row in auth_data[1:]:  # Пропускаем заголовок
-                if len(row) >= 3 and row[2] == user_id:  # Если находим совпадение по user_id (третий столбец)
-                    phone = row[0]  # Берем номер телефона из первого столбца
+                if len(row) >= 4 and row[3] == user_id:  # Если находим совпадение по user_id (четвертый столбец)
+                    phone = row[1]  # Берем номер телефона из второго столбца
+                    if len(row) >= 3 and row[2]:  # Проверяем наличие номера комнаты
+                        room_number = row[2]  # Берем номер комнаты из третьего столбца
                     break
         except Exception as e:
-            logging.error(f"Ошибка при получении номера телефона из таблицы Auth: {e}")
+            logging.error(f"Ошибка при получении данных из таблицы Auth: {e}")
         
         user_found = False
         
@@ -53,10 +56,14 @@ async def update_user_info(user):
         for idx, row in enumerate(all_users[1:], start=2):  # Пропускаем заголовок
             if row[0] == user_id:
                 # Обновляем основную информацию о пользователе, сохраняя текущее значение Room Number
-                # Внимание: мы не обновляем всю строку A:F, поскольку 6-я колонка теперь Room Number
                 users_sheet.update(f'A{idx}:E{idx}', 
                                 [[user_id, profile_link, first_name, last_name, phone]],
                                 value_input_option='USER_ENTERED')
+                
+                # Обновляем номер комнаты из таблицы Auth, если он есть
+                if room_number:
+                    users_sheet.update_cell(idx, 6, room_number)  # Колонка F (6) - Room Number
+                    logging.info(f"Номер комнаты {room_number} обновлен для пользователя {user.id}")
                 
                 # Проверяем и обновляем Start Time, только если оно не установлено
                 if not row[10] or row[10] == '':  # Индекс 10 - Start Time
@@ -73,18 +80,20 @@ async def update_user_info(user):
                 profile_link,
                 first_name,
                 last_name,
-                phone,       # Phone Number из таблицы Auth
-                '',          # Room Number (пустое)
-                '0',         # Orders Count
-                '0',         # Cancellations
-                '0',         # Total Sum
-                '0',         # Unpaid Sum
-                start_time,  # Start Time
-                ''           # Last Order Date
+                phone,           # Phone Number из таблицы Auth
+                room_number,     # Room Number из таблицы Auth (вместо пустого значения)
+                '0',             # Orders Count
+                '0',             # Cancellations
+                '0',             # Total Sum
+                '0',             # Unpaid Sum
+                start_time,      # Start Time
+                ''               # Last Order Date
             ]
             # Используем явное указание диапазона вместо append_row
             users_sheet.update(f'A{next_row}:L{next_row}', [new_user_row], value_input_option='USER_ENTERED')
             logging.info(f"Новая запись о пользователе добавлена в строку {next_row}")
+            if room_number:
+                logging.info(f"Номер комнаты {room_number} сохранен для нового пользователя {user.id}")
             
         if user_found:
             logging.info(f"Обновлена информация о пользователе {user.id} в таблице Users")
@@ -242,13 +251,27 @@ async def update_user_info_by_id(user_id: str):
         all_orders = orders_sheet.get_all_values()
         user_orders = [order for order in all_orders[1:] if order[3] == user_id]
         
+        # Получаем номер комнаты из таблицы Auth
+        room_number = ''
+        try:
+            auth_data = auth_sheet.get_all_values()
+            for row in auth_data[1:]:  # Пропускаем заголовок
+                if len(row) >= 4 and row[3] == user_id:  # Если находим совпадение по user_id (четвертый столбец)
+                    if len(row) >= 3 and row[2]:  # Проверяем наличие номера комнаты
+                        room_number = row[2]  # Берем номер комнаты из третьего столбца
+                    break
+        except Exception as e:
+            logging.error(f"Ошибка при получении номера комнаты из таблицы Auth: {e}")
+        
         if user_orders:
             latest_order = user_orders[-1]
             username = latest_order[4]  # Username в пятом столбце
             profile_link = f"t.me/{username}" if username and username != '-' else '-'
             
-            # Для номера комнаты берем данные из последнего заказа, если они есть
-            room_number = latest_order[6] if len(latest_order) > 6 else ''  # Room в седьмом столбце
+            # Используем номер комнаты из таблицы Auth, если он есть
+            # Если нет, берем данные из последнего заказа
+            if not room_number and len(latest_order) > 6:
+                room_number = latest_order[6]  # Room в седьмом столбце
             
             # Получаем все записи пользователей
             users_data = users_sheet.get_all_values()
@@ -261,7 +284,7 @@ async def update_user_info_by_id(user_id: str):
                 '-',         # First Name
                 '-',         # Last Name
                 '',          # Phone Number
-                room_number, # Room Number (новое поле)
+                room_number, # Room Number из таблицы Auth или из заказа
                 '0',         # Orders Count
                 '0',         # Cancellations
                 '0',         # Total Sum
@@ -272,6 +295,8 @@ async def update_user_info_by_id(user_id: str):
             # Используем явное указание диапазона вместо append_row
             users_sheet.update(f'A{next_row}:L{next_row}', [new_user_row], value_input_option='USER_ENTERED')
             logging.info(f"Новая базовая запись о пользователе {user_id} добавлена в строку {next_row}")
+            if room_number:
+                logging.info(f"Номер комнаты {room_number} сохранен для пользователя {user_id}")
             
             # Сразу обновляем статистику
             await update_user_stats(user_id)
