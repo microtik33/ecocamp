@@ -51,11 +51,12 @@ def get_users_sheet():
     except gspread.WorksheetNotFound as e:
         logging.warning(f"Лист не найден: {e}")
         logging.info("Создаем новый лист Users")
-        sheet = spreadsheet.add_worksheet("Users", 1000, 10)
-        sheet.update('A1:J1', [['User ID', 'Profile Link', 'First Name', 
-                              'Last Name', 'Phone Number', 'Start Time',
+        sheet = spreadsheet.add_worksheet("Users", 1000, 12)  # Увеличиваем количество столбцов с 10 до 12
+        sheet.update('A1:L1', [['User ID', 'Profile Link', 'First Name', 
+                              'Last Name', 'Phone Number', 'Room Number',  # Изменяем 6-й столбец
                               'Orders Count', 'Cancellations', 
-                              'Total Sum', 'Last Order Date']])
+                              'Total Sum', 'Unpaid Sum',  # Добавляем "Unpaid Sum" в 10-й столбец
+                              'Start Time', 'Last Order Date']])  # Start Time перемещаем в 11-й столбец
         return sheet
     except Exception as e:
         logging.error(f"Неожиданная ошибка при получении листа пользователей: {e}")
@@ -287,19 +288,21 @@ async def save_user_info(user_info: dict):
         
         if not user_exists:
             logging.info("Создаем новую запись о пользователе")
-            # Добавляем нового пользователя
+            # Добавляем нового пользователя с новой структурой
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             new_user_row = [
                 user_id,
                 profile_link,
                 username,
                 '-',  # First Name
                 '-',  # Last Name
-                '',   # Phone Number
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),  # Start Time
+                '',   # Room Number (было Start Time)
                 '0',  # Orders Count
                 '0',  # Cancellations
                 '0',  # Total Sum
-                ''    # Last Order Date
+                '0',  # Unpaid Sum (новый столбец)
+                now,  # Start Time (было Last Order Date)
+                ''    # Last Order Date (новый столбец)
             ]
             users_sheet.append_row(new_user_row, value_input_option='USER_ENTERED')
             logging.info("Новый пользователь добавлен")
@@ -316,10 +319,11 @@ async def get_user_stats(user_id: str):
         for row in users_data[1:]:  # Пропускаем заголовок
             if row[0] == user_id:
                 return {
-                    'orders_count': int(row[3]),
-                    'cancellations': int(row[4]),
-                    'total_sum': int(float(row[5])),
-                    'last_order_date': row[6]
+                    'orders_count': int(row[6]),  # Изменено с 3 на 6
+                    'cancellations': int(row[7]),  # Изменено с 4 на 7
+                    'total_sum': int(float(row[8])),  # Изменено с 5 на 8
+                    'unpaid_sum': int(float(row[9] or '0')),  # Новое поле
+                    'last_order_date': row[11]  # Изменено с 6 на 11
                 }
         return None
     except Exception as e:
