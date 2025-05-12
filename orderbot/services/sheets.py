@@ -949,19 +949,22 @@ async def save_payment_info(user_id: str, amount: float, status: str = "ожид
         now = datetime.now()
         formatted_datetime = now.strftime("%d.%m.%y %H:%M:%S")
         
-        # Формируем строку для записи
-        row = [
-            next_id,              # Номер оплаты
-            formatted_datetime,   # Дата и время
-            user_id,             # User ID
-            "",                  # Пустой комментарий
-            str(amount),         # Сумма оплаты
-            status,              # Статус оплаты
-            room                 # Номер комнаты
-        ]
+        # Получаем таблицу платежей
+        payments_sheet = get_payments_sheet()
         
-        # Добавляем запись в таблицу
-        get_payments_sheet().append_row(row, value_input_option='USER_ENTERED')
+        # Находим первую пустую строку
+        all_payments = payments_sheet.get_all_values()
+        next_row_index = len(all_payments) + 1
+        
+        # Обновляем каждую ячейку отдельно, пропуская колонку комментария (D)
+        payments_sheet.update_cell(next_row_index, 1, next_id)  # A - Номер оплаты
+        payments_sheet.update_cell(next_row_index, 2, formatted_datetime)  # B - Дата и время
+        payments_sheet.update_cell(next_row_index, 3, user_id)  # C - User ID
+        # Колонку D (Комментарий) не трогаем
+        payments_sheet.update_cell(next_row_index, 5, str(amount))  # E - Сумма оплаты
+        payments_sheet.update_cell(next_row_index, 6, status)  # F - Статус оплаты
+        payments_sheet.update_cell(next_row_index, 7, room)  # G - Номер комнаты
+        
         logging.info(f"Информация об оплате {next_id} сохранена в таблицу")
         return True
         
