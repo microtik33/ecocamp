@@ -82,7 +82,9 @@ async def update_user_info(user):
                 start_time,  # Start Time
                 ''           # Last Order Date
             ]
-            users_sheet.append_row(new_user_row, value_input_option='USER_ENTERED')
+            # Используем явное указание диапазона вместо append_row
+            users_sheet.update(f'A{next_row}:L{next_row}', [new_user_row], value_input_option='USER_ENTERED')
+            logging.info(f"Новая запись о пользователе добавлена в строку {next_row}")
             
         if user_found:
             logging.info(f"Обновлена информация о пользователе {user.id} в таблице Users")
@@ -248,6 +250,10 @@ async def update_user_info_by_id(user_id: str):
             # Для номера комнаты берем данные из последнего заказа, если они есть
             room_number = latest_order[6] if len(latest_order) > 6 else ''  # Room в седьмом столбце
             
+            # Получаем все записи пользователей
+            users_data = users_sheet.get_all_values()
+            next_row = len(users_data) + 1
+            
             # Добавляем базовую запись с новой структурой
             new_user_row = [
                 user_id,
@@ -263,7 +269,9 @@ async def update_user_info_by_id(user_id: str):
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),  # Start Time
                 ''           # Last Order Date
             ]
-            users_sheet.append_row(new_user_row, value_input_option='USER_ENTERED')
+            # Используем явное указание диапазона вместо append_row
+            users_sheet.update(f'A{next_row}:L{next_row}', [new_user_row], value_input_option='USER_ENTERED')
+            logging.info(f"Новая базовая запись о пользователе {user_id} добавлена в строку {next_row}")
             
             # Сразу обновляем статистику
             await update_user_stats(user_id)

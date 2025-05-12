@@ -304,8 +304,11 @@ async def save_user_info(user_info: dict):
                 now,  # Start Time (было Last Order Date)
                 ''    # Last Order Date (новый столбец)
             ]
-            users_sheet.append_row(new_user_row, value_input_option='USER_ENTERED')
-            logging.info("Новый пользователь добавлен")
+            
+            # Используем явное указание диапазона для добавления новой строки
+            next_row = len(users_data) + 1
+            users_sheet.update(f'A{next_row}:L{next_row}', [new_user_row], value_input_option='USER_ENTERED')
+            logging.info(f"Новый пользователь добавлен в строку {next_row}")
         
         return True
     except Exception as e:
