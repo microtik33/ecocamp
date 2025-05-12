@@ -898,8 +898,8 @@ def get_payments_sheet():
     try:
         return spreadsheet.get_worksheet_by_id(PAYMENTS_SHEET_ID)
     except gspread.WorksheetNotFound:
-        sheet = spreadsheet.add_worksheet("Payments", 1000, 6)
-        sheet.update('A1:F1', [['Номер оплаты', 'Дата и время', 'User ID', 'Комментарий', 'Сумма', 'Статус']])
+        sheet = spreadsheet.add_worksheet("Payments", 1000, 7)
+        sheet.update('A1:G1', [['Номер оплаты', 'Дата и время', 'User ID', 'Комментарий', 'Сумма', 'Статус', 'Номер комнаты']])
         return sheet
 
 def get_next_payment_id() -> str:
@@ -929,13 +929,14 @@ def get_next_payment_id() -> str:
         logging.error(f"Ошибка при получении следующего номера оплаты: {e}")
         return "1"
 
-async def save_payment_info(user_id: str, amount: float, status: str = "ожидает") -> bool:
+async def save_payment_info(user_id: str, amount: float, status: str = "ожидает", room: str = "") -> bool:
     """Сохранение информации об оплате в таблицу.
     
     Args:
         user_id: ID пользователя
         amount: Сумма оплаты
         status: Статус оплаты (ожидает, оплачено, отменено, отклонено)
+        room: Номер комнаты пользователя
         
     Returns:
         bool: True в случае успешного сохранения, False в противном случае
@@ -955,7 +956,8 @@ async def save_payment_info(user_id: str, amount: float, status: str = "ожид
             user_id,             # User ID
             "",                  # Пустой комментарий
             str(amount),         # Сумма оплаты
-            status              # Статус оплаты
+            status,              # Статус оплаты
+            room                 # Номер комнаты
         ]
         
         # Добавляем запись в таблицу

@@ -78,6 +78,9 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Рассчитываем общую сумму заказов
     total_sum = sum(int(float(order[5])) for order in user_orders if order[5])
     
+    # Получаем номер комнаты из первого заказа пользователя
+    room_number = user_orders[0][6] if user_orders and len(user_orders[0]) > 6 else ""
+    
     if total_sum <= 0:
         keyboard = [
             [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')]
@@ -93,7 +96,7 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     amount_kopecks = int(total_sum * 100)
     
     # Формируем назначение платежа
-    payment_purpose = f"Оплата заказа"
+    payment_purpose = f"Оплата заказа (комната {room_number})" if room_number else "Оплата заказа"
     
     try:
         # Создаем QR-код
@@ -120,7 +123,8 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         payment_saved = await save_payment_info(
             user_id=str(update.effective_user.id),
             amount=total_sum,
-            status="ожидает"
+            status="ожидает",
+            room=room_number
         )
         
         if not payment_saved:
@@ -149,7 +153,8 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             'payload': qr_data.get('payload', ''),
             'status_checks': 0,  # Счетчик проверок статуса
             'payment_id': last_payment_id,  # ID оплаты в таблице
-            'chat_id': update.effective_chat.id  # Сохраняем ID чата
+            'chat_id': update.effective_chat.id,  # Сохраняем ID чата
+            'room': room_number  # Сохраняем номер комнаты
         }
         
         # Декодируем изображение QR-кода из base64
@@ -1153,7 +1158,7 @@ async def update_payment_status(payments_sheet, payment_id: str, new_status: str
         # Ищем строку с нужным номером оплаты
         for idx, row in enumerate(all_payments[1:], start=2):  # Пропускаем заголовок
             if row[0] == payment_id:
-                # Обновляем статус в последнем столбце
+                # Обновляем статус в столбце 6 (F)
                 payments_sheet.update_cell(idx, 6, new_status)
                 logging.info(f"Статус оплаты {payment_id} обновлен на '{new_status}'")
                 return True
