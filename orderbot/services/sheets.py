@@ -89,8 +89,8 @@ def get_auth_sheet():
     try:
         return spreadsheet.get_worksheet_by_id(AUTH_SHEET_ID)
     except gspread.WorksheetNotFound:
-        sheet = spreadsheet.add_worksheet("Auth", 1000, 2)
-        sheet.update('A1:B1', [['Phone Number', 'User ID']])
+        sheet = spreadsheet.add_worksheet("Auth", 1000, 3)
+        sheet.update('A1:C1', [['Phone Number', 'Room Number', 'User ID']])
         return sheet
 
 @profile_time
@@ -720,7 +720,7 @@ def is_user_authorized(user_id: str) -> bool:
     """
     try:
         # Получаем все значения из столбца B (user_id)
-        user_ids = get_auth_sheet().col_values(2)
+        user_ids = get_auth_sheet().col_values(3)
         return str(user_id) in user_ids
     except Exception as e:
         logging.error(f"Ошибка при проверке авторизации пользователя: {e}")
@@ -743,8 +743,8 @@ def save_user_id(phone: str, user_id: str) -> bool:
         phones = get_auth_sheet().col_values(1)
         # Ищем индекс строки с нужным телефоном
         row_idx = phones.index(phone) + 1  # +1 потому что в gspread строки начинаются с 1
-        # Обновляем ячейку с user_id (столбец B)
-        get_auth_sheet().update_cell(row_idx, 2, user_id)
+        # Обновляем ячейку с user_id (столбец C)
+        get_auth_sheet().update_cell(row_idx, 3, user_id)
         return True
     except Exception as e:
         logging.error(f"Ошибка при сохранении user_id: {e}")

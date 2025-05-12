@@ -38,10 +38,10 @@ async def update_user_info(user):
         # Получаем номер телефона из таблицы Auth
         phone = ''
         try:
-            # Получаем все значения из столбцов A (телефоны) и B (user_id)
+            # Получаем все значения из столбцов таблицы Auth
             auth_data = auth_sheet.get_all_values()
             for row in auth_data[1:]:  # Пропускаем заголовок
-                if row[1] == user_id:  # Если находим совпадение по user_id
+                if len(row) >= 3 and row[2] == user_id:  # Если находим совпадение по user_id (третий столбец)
                     phone = row[0]  # Берем номер телефона из первого столбца
                     break
         except Exception as e:
