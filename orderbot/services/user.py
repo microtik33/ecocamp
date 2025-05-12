@@ -42,10 +42,8 @@ async def update_user_info(user):
             # Получаем все значения из столбцов таблицы Auth
             auth_data = auth_sheet.get_all_values()
             for row in auth_data[1:]:  # Пропускаем заголовок
-                if len(row) >= 4 and row[3] == user_id:  # Если находим совпадение по user_id (четвертый столбец)
-                    phone = row[1]  # Берем номер телефона из второго столбца
-                    if len(row) >= 3 and row[2]:  # Проверяем наличие номера комнаты
-                        room_number = row[2]  # Берем номер комнаты из третьего столбца
+                if len(row) >= 3 and row[2] == user_id:  # Если находим совпадение по user_id (третий столбец)
+                    phone = row[0]  # Берем номер телефона из первого столбца
                     break
         except Exception as e:
             logging.error(f"Ошибка при получении данных из таблицы Auth: {e}")
