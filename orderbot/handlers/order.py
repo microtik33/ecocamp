@@ -774,7 +774,7 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
         
         # Добавляем заказы, ожидающие оплаты
         if awaiting_payment_orders:
-            messages.append(escape_markdown_v2("Ваши заказы, ожидающие оплаты:"))
+            messages.append(escape_markdown_v2("Приготовленные заказы, ожидающие оплаты:"))
             for order in awaiting_payment_orders:
                 # Формируем информацию о заказе
                 delivery_date = order[11] if order[11] else None
@@ -812,7 +812,7 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
                 messages.append(current_message)
                 current_message = ""
             
-            messages.append(escape_markdown_v2("Ваши заказы, переданные повару:"))
+            messages.append(escape_markdown_v2("Принятые заказы, переданные повару:"))
             for order in processing_orders:
                 # Формируем информацию о заказе
                 delivery_date = order[11] if order[11] else None

@@ -354,7 +354,7 @@ async def test_show_user_orders(mock_update: Update, mock_context: MagicMock) ->
                     
                     # Проверяем, что разные статусы заказов отображаются
                     text = args[0][0]
-                    assert "Ваши заказы, ожидающие оплаты:" in text
+                    assert "Приготовленные заказы, ожидающие оплаты:" in text
                     assert "Ожидает оплаты" in text
                     assert "Принят" in text
                     assert "Активен" in text
