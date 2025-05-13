@@ -12,12 +12,10 @@ from telegram.ext import (
 from telegram import Update
 from .handlers.menu import start, show_tomorrow_menu, show_dish_compositions, back_to_main_menu, show_today_menu, update_caches
 from .handlers.order import (
-    PHONE, MENU, ROOM, NAME, MEAL_TYPE, 
+    PHONE, MENU, MEAL_TYPE, 
     DISH_SELECTION, WISHES, QUESTION,
-    ask_room,
     show_user_orders,
     cancel_order,
-    ask_name,
     handle_order_update,
     ask_meal_type,
     show_dishes,
@@ -163,7 +161,7 @@ async def main() -> None:
                     MessageHandler(filters.CONTACT, handle_phone)
                 ],
                 MENU: [
-                    CallbackQueryHandler(ask_room, pattern='new_order'),
+                    CallbackQueryHandler(handle_order_update, pattern='new_order'),
                     CallbackQueryHandler(handle_order_update, pattern='edit_order'),
                     CallbackQueryHandler(show_user_orders, pattern='my_orders'),
                     CallbackQueryHandler(handle_question, pattern='question'),
@@ -174,15 +172,6 @@ async def main() -> None:
                     CallbackQueryHandler(show_dish_compositions, pattern='show_compositions'),
                     CallbackQueryHandler(back_to_main_menu, pattern='back_to_menu'),
                     CallbackQueryHandler(create_payment, pattern='pay_orders')
-                ],
-                ROOM: [
-                    CallbackQueryHandler(ask_name, pattern='^room:([1-9]|1[0-9]|20)$'),
-                    CallbackQueryHandler(handle_order_update, pattern='cancel')
-                ],
-                NAME: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, ask_meal_type),
-                    CallbackQueryHandler(handle_order_update, pattern='cancel'),
-                    CallbackQueryHandler(handle_order_update, pattern='back')
                 ],
                 MEAL_TYPE: [
                     CallbackQueryHandler(show_dishes, pattern='^meal:(Завтрак|Обед|Ужин)$'),
