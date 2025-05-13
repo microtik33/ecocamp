@@ -1036,6 +1036,13 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
             # Возврат к выбору типа еды
             context.user_data['state'] = MEAL_TYPE
             
+            # Очищаем выбранные блюда и их количество при возврате назад
+            if 'order' in context.user_data:
+                if 'dishes' in context.user_data['order']:
+                    context.user_data['order']['dishes'] = []
+                if 'quantities' in context.user_data['order']:
+                    context.user_data['order']['quantities'] = {}
+            
             # Получаем даты выдачи для каждого типа приема пищи
             breakfast_date = get_delivery_date('breakfast')
             lunch_date = get_delivery_date('lunch')
