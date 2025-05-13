@@ -585,6 +585,18 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
         processing_orders = [order for order in user_orders if order[2] == 'Принят']
         active_orders = [order for order in user_orders if order[2] == 'Активен']
         
+        # Сортируем активные заказы по типу еды: Завтрак - Обед - Ужин
+        def meal_type_priority(meal_type):
+            if meal_type == 'Завтрак':
+                return 0
+            elif meal_type == 'Обед':
+                return 1
+            elif meal_type == 'Ужин':
+                return 2
+            return 3  # Для других значений
+            
+        active_orders.sort(key=lambda x: meal_type_priority(x[8]))
+        
         messages = []
         current_message = ""
         total_sum = 0
