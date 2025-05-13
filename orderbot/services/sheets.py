@@ -51,12 +51,12 @@ def get_users_sheet():
     except gspread.WorksheetNotFound as e:
         logging.warning(f"Лист не найден: {e}")
         logging.info("Создаем новый лист Users")
-        sheet = spreadsheet.add_worksheet("Users", 1000, 12)  # Увеличиваем количество столбцов с 10 до 12
-        sheet.update('A1:L1', [['User ID', 'Profile Link', 'First Name', 
-                              'Last Name', 'Phone Number', 'Room Number',  # Изменяем 6-й столбец
+        sheet = spreadsheet.add_worksheet("Users", 1000, 11)  # Уменьшаем количество столбцов с 12 до 11
+        sheet.update('A1:K1', [['User ID', 'Profile Link', 'First Name', 
+                              'Phone Number', 'Room Number',
                               'Orders Count', 'Cancellations', 
-                              'Total Sum', 'Unpaid Sum',  # Добавляем "Unpaid Sum" в 10-й столбец
-                              'Start Time', 'Last Order Date']])  # Start Time перемещаем в 11-й столбец
+                              'Total Sum', 'Unpaid Sum',
+                              'Start Time', 'Last Order Date']])
         return sheet
     except Exception as e:
         logging.error(f"Неожиданная ошибка при получении листа пользователей: {e}")
@@ -274,13 +274,24 @@ async def save_user_info(user_info: dict):
         users_data = users_sheet.get_all_values()
         logging.info(f"Получено {len(users_data)} строк из листа пользователей")
         
+        # Получаем имя из таблицы Auth
+        auth_name = '-'
+        try:
+            auth_data = get_auth_sheet().get_all_values()
+            for row in auth_data[1:]:  # Пропускаем заголовок
+                if len(row) >= 4 and row[3] == user_id:  # Если находим совпадение по user_id (четвертый столбец)
+                    auth_name = row[0] or '-'  # Берем имя из первого столбца
+                    break
+        except Exception as e:
+            logging.error(f"Ошибка при получении имени из таблицы Auth: {e}")
+        
         user_exists = False
         for idx, row in enumerate(users_data):
             if row[0] == user_id:
                 logging.info(f"Найден существующий пользователь в строке {idx + 1}")
                 # Обновляем существующего пользователя
                 users_sheet.update(f'A{idx+1}:C{idx+1}', 
-                                 [[user_id, profile_link, username]],
+                                 [[user_id, profile_link, auth_name]],
                                  value_input_option='USER_ENTERED')
                 user_exists = True
                 logging.info("Информация о пользователе обновлена")
@@ -293,21 +304,20 @@ async def save_user_info(user_info: dict):
             new_user_row = [
                 user_id,
                 profile_link,
-                username,
-                '-',  # First Name
-                '-',  # Last Name
-                '',   # Room Number (было Start Time)
-                '0',  # Orders Count
-                '0',  # Cancellations
-                '0',  # Total Sum
-                '0',  # Unpaid Sum (новый столбец)
-                now,  # Start Time (было Last Order Date)
-                ''    # Last Order Date (новый столбец)
+                auth_name,   # Имя из таблицы Auth
+                '-',         # Phone Number
+                '',          # Room Number (было Start Time)
+                '0',         # Orders Count
+                '0',         # Cancellations
+                '0',         # Total Sum
+                '0',         # Unpaid Sum (новый столбец)
+                now,         # Start Time
+                ''           # Last Order Date
             ]
             
             # Используем явное указание диапазона для добавления новой строки
             next_row = len(users_data) + 1
-            users_sheet.update(f'A{next_row}:L{next_row}', [new_user_row], value_input_option='USER_ENTERED')
+            users_sheet.update(f'A{next_row}:K{next_row}', [new_user_row], value_input_option='USER_ENTERED')
             logging.info(f"Новый пользователь добавлен в строку {next_row}")
         
         return True
@@ -322,11 +332,11 @@ async def get_user_stats(user_id: str):
         for row in users_data[1:]:  # Пропускаем заголовок
             if row[0] == user_id:
                 return {
-                    'orders_count': int(row[6]),  # Изменено с 3 на 6
-                    'cancellations': int(row[7]),  # Изменено с 4 на 7
-                    'total_sum': int(float(row[8])),  # Изменено с 5 на 8
-                    'unpaid_sum': int(float(row[9] or '0')),  # Новое поле
-                    'last_order_date': row[11]  # Изменено с 6 на 11
+                    'orders_count': int(row[5]),  # Orders Count (сдвинуто влево)
+                    'cancellations': int(row[6]),  # Cancellations (сдвинуто влево)
+                    'total_sum': int(float(row[7])),  # Total Sum (сдвинуто влево)
+                    'unpaid_sum': int(float(row[8] or '0')),  # Unpaid Sum (сдвинуто влево)
+                    'last_order_date': row[10]  # Last Order Date (сдвинуто влево)
                 }
         return None
     except Exception as e:

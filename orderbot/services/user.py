@@ -9,8 +9,6 @@ async def update_user_info(user):
     user_id = str(user.id).strip("'")  # Убираем апострофы, если они есть
     username = user.username or '-'
     profile_link = f"t.me/{username}" if username != '-' else '-'
-    first_name = user.first_name or '-'
-    last_name = user.last_name or '-'
     start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     try:
@@ -23,19 +21,19 @@ async def update_user_info(user):
                 'User ID',
                 'Profile Link',
                 'First Name',
-                'Last Name',
                 'Phone Number',
-                'Room Number',  # Был Start Time, теперь Room Number
+                'Room Number',
                 'Orders Count',
                 'Cancellations',
                 'Total Sum',
-                'Unpaid Sum',   # Новый столбец: сумма неоплаченных заказов
-                'Start Time',   # Перемещен с 6-й позиции на 11-ю
-                'Last Order Date'  # Перемещен с 10-й на 12-ю
+                'Unpaid Sum',
+                'Start Time',
+                'Last Order Date'
             ], value_input_option='USER_ENTERED')
             all_users = users_sheet.get_all_values()
         
-        # Получаем номер телефона и номер комнаты из таблицы Auth
+        # Получаем имя, номер телефона и номер комнаты из таблицы Auth
+        auth_name = '-'
         phone = ''
         room_number = ''
         try:
@@ -43,6 +41,7 @@ async def update_user_info(user):
             auth_data = auth_sheet.get_all_values()
             for row in auth_data[1:]:  # Пропускаем заголовок
                 if len(row) >= 4 and row[3] == user_id:  # Если находим совпадение по user_id (четвертый столбец)
+                    auth_name = row[0] or '-'  # Берем имя из первого столбца
                     phone = row[1]  # Берем номер телефона из второго столбца
                     if len(row) >= 3 and row[2]:  # Проверяем наличие номера комнаты
                         room_number = row[2]  # Берем номер комнаты из третьего столбца
@@ -56,18 +55,18 @@ async def update_user_info(user):
         for idx, row in enumerate(all_users[1:], start=2):  # Пропускаем заголовок
             if row[0] == user_id:
                 # Обновляем основную информацию о пользователе, сохраняя текущее значение Room Number
-                users_sheet.update(f'A{idx}:E{idx}', 
-                                [[user_id, profile_link, first_name, last_name, phone]],
+                users_sheet.update(f'A{idx}:D{idx}', 
+                                [[user_id, profile_link, auth_name, phone]],
                                 value_input_option='USER_ENTERED')
                 
                 # Обновляем номер комнаты из таблицы Auth, если он есть
                 if room_number:
-                    users_sheet.update_cell(idx, 6, room_number)  # Колонка F (6) - Room Number
+                    users_sheet.update_cell(idx, 5, room_number)  # Колонка E (5) - Room Number (сдвинуто влево)
                     logging.info(f"Номер комнаты {room_number} обновлен для пользователя {user.id}")
                 
                 # Проверяем и обновляем Start Time, только если оно не установлено
-                if not row[10] or row[10] == '':  # Индекс 10 - Start Time
-                    users_sheet.update_cell(idx, 11, start_time)  # Колонка K (11) - Start Time
+                if not row[9] or row[9] == '':  # Индекс 9 - Start Time (сдвинуто влево)
+                    users_sheet.update_cell(idx, 10, start_time)  # Колонка J (10) - Start Time (сдвинуто влево)
                 
                 user_found = True
                 break
@@ -78,19 +77,18 @@ async def update_user_info(user):
             new_user_row = [
                 user_id,
                 profile_link,
-                first_name,
-                last_name,
-                phone,           # Phone Number из таблицы Auth
-                room_number,     # Room Number из таблицы Auth (вместо пустого значения)
-                '0',             # Orders Count
-                '0',             # Cancellations
-                '0',             # Total Sum
-                '0',             # Unpaid Sum
-                start_time,      # Start Time
-                ''               # Last Order Date
+                auth_name,      # Имя из таблицы Auth вместо first_name
+                phone,          # Phone Number из таблицы Auth
+                room_number,    # Room Number из таблицы Auth
+                '0',            # Orders Count
+                '0',            # Cancellations
+                '0',            # Total Sum
+                '0',            # Unpaid Sum
+                start_time,     # Start Time
+                ''              # Last Order Date
             ]
             # Используем явное указание диапазона вместо append_row
-            users_sheet.update(f'A{next_row}:L{next_row}', [new_user_row], value_input_option='USER_ENTERED')
+            users_sheet.update(f'A{next_row}:K{next_row}', [new_user_row], value_input_option='USER_ENTERED')
             logging.info(f"Новая запись о пользователе добавлена в строку {next_row}")
             if room_number:
                 logging.info(f"Номер комнаты {room_number} сохранен для нового пользователя {user.id}")
@@ -145,10 +143,10 @@ async def update_user_totals():
         unpaid = user_unpaid.get(user_id, 0)
         
         # Обновляем общую сумму заказов
-        users_sheet.update_cell(idx, 9, str(int(total)))  # Обновляем столбец I (9) - Total Sum
+        users_sheet.update_cell(idx, 8, str(int(total)))  # Обновляем столбец H (8) - Total Sum (сдвинуто влево)
         
         # Обновляем сумму неоплаченных заказов
-        users_sheet.update_cell(idx, 10, str(int(unpaid)))  # Обновляем столбец J (10) - Unpaid Sum
+        users_sheet.update_cell(idx, 9, str(int(unpaid)))  # Обновляем столбец I (9) - Unpaid Sum (сдвинуто влево)
 
 async def update_user_stats(user_id: str):
     """Обновление статистики пользователя."""
@@ -225,18 +223,18 @@ async def update_user_stats(user_id: str):
             formatted_date = last_order_date.strftime("%d.%m.%Y %H:%M:%S") if last_order_date else ''
             logging.info(f"Обновление статистики для пользователя {user_id}: активных заказов {active_orders}, отмен {cancelled_orders}, общая сумма {total_sum}, неоплаченная сумма {unpaid_sum}, последний заказ {formatted_date}")
             
-            # Обновляем статистику 
-            # G-K: Orders Count, Cancellations, Total Sum, Unpaid Sum, Last Order Date (переместилась с J на L)
-            users_sheet.update(f'G{user_row}:J{user_row}', 
+            # Обновляем статистику (смещено влево из-за удаления колонки Last Name)
+            # F-I: Orders Count, Cancellations, Total Sum, Unpaid Sum
+            users_sheet.update(f'F{user_row}:I{user_row}', 
                              [[str(active_orders), 
                                str(cancelled_orders), 
                                str(int(total_sum)),
                                str(int(unpaid_sum))]],  # Добавляем неоплаченную сумму
                              value_input_option='USER_ENTERED')
             
-            # Отдельно обновляем дату последнего заказа (теперь в столбце L)
+            # Отдельно обновляем дату последнего заказа (теперь в столбце K)
             if formatted_date:
-                users_sheet.update_cell(user_row, 12, formatted_date)
+                users_sheet.update_cell(user_row, 11, formatted_date)
         
         logging.info(f"Обновлена статистика пользователей в таблице Users")
         return True
@@ -251,17 +249,19 @@ async def update_user_info_by_id(user_id: str):
         all_orders = orders_sheet.get_all_values()
         user_orders = [order for order in all_orders[1:] if order[3] == user_id]
         
-        # Получаем номер комнаты из таблицы Auth
+        # Получаем имя и номер комнаты из таблицы Auth
+        auth_name = '-'
         room_number = ''
         try:
             auth_data = auth_sheet.get_all_values()
             for row in auth_data[1:]:  # Пропускаем заголовок
                 if len(row) >= 4 and row[3] == user_id:  # Если находим совпадение по user_id (четвертый столбец)
+                    auth_name = row[0] or '-'  # Берем имя из первого столбца
                     if len(row) >= 3 and row[2]:  # Проверяем наличие номера комнаты
                         room_number = row[2]  # Берем номер комнаты из третьего столбца
                     break
         except Exception as e:
-            logging.error(f"Ошибка при получении номера комнаты из таблицы Auth: {e}")
+            logging.error(f"Ошибка при получении данных из таблицы Auth: {e}")
         
         if user_orders:
             latest_order = user_orders[-1]
@@ -272,23 +272,22 @@ async def update_user_info_by_id(user_id: str):
             users_data = users_sheet.get_all_values()
             next_row = len(users_data) + 1
             
-            # Добавляем базовую запись с новой структурой
+            # Добавляем базовую запись с новой структурой (без Last Name)
             new_user_row = [
                 user_id,
                 profile_link,
-                '-',         # First Name
-                '-',         # Last Name
-                '',          # Phone Number
-                room_number, # Room Number из таблицы Auth или из заказа
-                '0',         # Orders Count
-                '0',         # Cancellations
-                '0',         # Total Sum
-                '0',         # Unpaid Sum (новое поле)
+                auth_name,    # First Name из таблицы Auth
+                '',           # Phone Number
+                room_number,  # Room Number из таблицы Auth
+                '0',          # Orders Count
+                '0',          # Cancellations
+                '0',          # Total Sum
+                '0',          # Unpaid Sum
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),  # Start Time
-                ''           # Last Order Date
+                ''            # Last Order Date
             ]
             # Используем явное указание диапазона вместо append_row
-            users_sheet.update(f'A{next_row}:L{next_row}', [new_user_row], value_input_option='USER_ENTERED')
+            users_sheet.update(f'A{next_row}:K{next_row}', [new_user_row], value_input_option='USER_ENTERED')
             logging.info(f"Новая базовая запись о пользователе {user_id} добавлена в строку {next_row}")
             if room_number:
                 logging.info(f"Номер комнаты {room_number} сохранен для пользователя {user_id}")
@@ -309,8 +308,8 @@ async def save_user_phone(user_id: str, phone: str):
         users_data = users_sheet.get_all_values()
         for idx, row in enumerate(users_data):
             if row[0] == user_id:
-                # Обновляем номер телефона (столбец E) - индекс не меняется
-                users_sheet.update(f'E{idx + 1}', [[phone]], value_input_option='USER_ENTERED')
+                # Обновляем номер телефона (столбец D) - индекс смещен влево из-за удаления Last Name
+                users_sheet.update(f'D{idx + 1}', [[phone]], value_input_option='USER_ENTERED')
                 logging.info(f"Сохранен номер телефона для пользователя {user_id} в таблице Auth")
                 return True
         return False
@@ -320,7 +319,41 @@ async def save_user_phone(user_id: str, phone: str):
 
 async def create_user_record(user_id: int, username: str, first_name: str, last_name: str) -> bool:
     try:
-        # ... existing code ...
+        # Получаем имя из таблицы Auth
+        auth_name = '-'
+        try:
+            auth_data = auth_sheet.get_all_values()
+            for row in auth_data[1:]:  # Пропускаем заголовок
+                if len(row) >= 4 and row[3] == str(user_id):  # Если находим совпадение по user_id (четвертый столбец)
+                    auth_name = row[0] or '-'  # Берем имя из первого столбца
+                    break
+        except Exception as e:
+            logging.error(f"Ошибка при получении данных из таблицы Auth: {e}")
+            
+        # Используем имя из Auth или из параметров
+        name_to_use = auth_name if auth_name != '-' else first_name
+        profile_link = f"t.me/{username}" if username and username != '-' else '-'
+        
+        # Получаем все записи пользователей
+        users_data = users_sheet.get_all_values()
+        next_row = len(users_data) + 1
+        
+        # Добавляем запись с новой структурой
+        new_user_row = [
+            str(user_id),
+            profile_link,
+            name_to_use,    # First Name из Auth или параметров
+            '',             # Phone Number
+            '',             # Room Number
+            '0',            # Orders Count
+            '0',            # Cancellations
+            '0',            # Total Sum
+            '0',            # Unpaid Sum
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),  # Start Time
+            ''              # Last Order Date
+        ]
+        # Используем явное указание диапазона вместо append_row
+        users_sheet.update(f'A{next_row}:K{next_row}', [new_user_row], value_input_option='USER_ENTERED')
         logging.info(f"Создана новая запись о пользователе {user_id} в таблице Users")
         return True
     except Exception as e:
