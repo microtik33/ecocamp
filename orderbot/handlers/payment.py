@@ -15,6 +15,7 @@ from ..services.sheets import get_orders_sheet, update_order, save_payment_info,
 from ..config import TOCHKA_ACCOUNT_ID, TOCHKA_MERCHANT_ID, TOCHKA_JWT_TOKEN
 from ..utils.auth_decorator import require_auth
 from .states import MENU, PAYMENT
+from ..services.user import get_user_data
 
 # Настройка логгера
 logger = logging.getLogger(__name__)
@@ -78,8 +79,9 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Рассчитываем общую сумму заказов
     total_sum = sum(int(float(order[5])) for order in user_orders if order[5])
     
-    # Получаем номер комнаты из первого заказа пользователя
-    room_number = user_orders[0][6] if user_orders and len(user_orders[0]) > 6 else ""
+    # Получаем номер комнаты из таблицы пользователей через функцию get_user_data
+    user_data = await get_user_data(user_id)
+    room_number = user_data.get('room', '')
     
     if total_sum <= 0:
         keyboard = [
