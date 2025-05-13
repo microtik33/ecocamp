@@ -9,10 +9,10 @@ from ..services.sheets import (
     orders_sheet, get_dishes_for_meal, get_next_order_id, 
     save_order, update_order, is_user_authorized
 )
-from ..services.user import update_user_info, update_user_stats
+from ..services.user import update_user_info, update_user_stats, get_user_data
 from ..utils.time_utils import is_order_time
 from ..utils.auth_decorator import require_auth
-from .states import PHONE, MENU, ROOM, NAME, MEAL_TYPE, DISH_SELECTION, WISHES, QUESTION, EDIT_ORDER, PAYMENT
+from .states import PHONE, MENU, MEAL_TYPE, DISH_SELECTION, WISHES, QUESTION, EDIT_ORDER, PAYMENT
 from typing import List, Tuple, Dict, Optional, Any, Union
 from ..utils.profiler import profile_time
 from ..utils.markdown_utils import escape_markdown_v2
@@ -86,192 +86,6 @@ async def handle_order_time_error(update: telegram.Update, context: telegram.ext
 
 @profile_time
 @require_auth
-async def ask_room(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
-    """Запрос номера комнаты."""
-    query = update.callback_query
-    await query.answer()
-    
-    # Проверяем время для заказа
-    if not is_order_time():
-        return await handle_order_time_error(update, context)
-    
-    # Очищаем данные предыдущего заказа, если это не редактирование
-    if not context.user_data.get('editing'):
-        context.user_data['order'] = {}
-    
-    # Формируем клавиатуру с номерами комнат
-    keyboard = [
-        [InlineKeyboardButton(f"{i}", callback_data=f"room:{i}") for i in range(1, 6)],
-        [InlineKeyboardButton(f"{i}", callback_data=f"room:{i}") for i in range(6, 11)],
-        [InlineKeyboardButton(f"{i}", callback_data=f"room:{i}") for i in range(11, 16)],
-        [InlineKeyboardButton(f"{i}", callback_data=f"room:{i}") for i in range(16, 21)],
-        [InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    # Отправляем сообщение с формой заказа
-    order_message = await show_order_form(update, context)
-    sent_message = await query.message.reply_text(order_message)
-    context.user_data['order_chat_id'] = sent_message.chat_id
-    context.user_data['order_message_id'] = sent_message.message_id
-    
-    # Отправляем сообщение с выбором комнаты
-    await query.message.reply_text(translations.get_message('choose_room'), reply_markup=reply_markup, parse_mode="MarkdownV2")
-    await query.message.delete()
-    return ROOM
-
-async def ask_name(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
-    """Запрос имени."""
-    query = update.callback_query
-    await query.answer()
-    await query.delete_message()
-    
-    action, value = query.data.split(':')
-    if action == 'room':
-        if context.user_data.get('editing') and context.user_data['order'].get('room') == value:
-            pass
-        else:
-            context.user_data['order']['room'] = value
-    
-    context.user_data['state'] = NAME
-    
-    order_message = await show_order_form(update, context)
-    prompt_message = translations.get_message('enter_name')
-    
-    keyboard = [
-        [InlineKeyboardButton(translations.get_button('back'), callback_data="back")],
-        [InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    try:
-        await context.bot.edit_message_text(
-            chat_id=context.user_data['order_chat_id'],
-            message_id=context.user_data['order_message_id'],
-            text=order_message
-        )
-    except telegram.error.BadRequest as e:
-        if "Message is not modified" in str(e):
-            # Если сообщение не изменилось, просто пропускаем ошибку
-            pass
-        else:
-            raise e
-    
-    sent_message = await query.message.reply_text(prompt_message, reply_markup=reply_markup)
-    context.user_data['prompt_message_id'] = sent_message.message_id
-    return NAME
-
-@profile_time
-@require_auth
-async def ask_meal_type(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
-    """Запрос типа еды."""
-    context.user_data['state'] = MEAL_TYPE
-    
-    try:
-        await context.bot.delete_message(
-            chat_id=update.effective_chat.id,
-            message_id=context.user_data['prompt_message_id']
-        )
-    except Exception as e:
-        print(f"Ошибка при удалении сообщения с запросом имени: {e}")
-    
-    if not isinstance(update, telegram.Update) or not update.message:
-        pass
-    else:
-        if context.user_data.get('editing') and context.user_data['order'].get('name') == update.message.text:
-            pass
-        else:
-            context.user_data['order']['name'] = update.message.text
-        await update.message.delete()
-    
-    order_message = await show_order_form(update, context)
-    prompt_message = translations.get_message('choose_meal')
-    
-    # Получаем даты выдачи для каждого типа приема пищи
-    breakfast_date = get_delivery_date('breakfast')
-    lunch_date = get_delivery_date('lunch')
-    dinner_date = get_delivery_date('dinner')
-    
-    # Форматируем даты в строки
-    date_format = "%d.%m"
-    breakfast_str = breakfast_date.strftime(date_format)
-    lunch_str = lunch_date.strftime(date_format)
-    dinner_str = dinner_date.strftime(date_format)
-    
-    # Формируем клавиатуру с датами
-    keyboard = [
-        [
-            InlineKeyboardButton(f"{translations.get_button('breakfast')} ({breakfast_str})", 
-                               callback_data="meal:Завтрак"),
-            InlineKeyboardButton(f"{translations.get_button('lunch')} ({lunch_str})", 
-                               callback_data="meal:Обед"),
-            InlineKeyboardButton(f"{translations.get_button('dinner')} ({dinner_str})", 
-                               callback_data="meal:Ужин")
-        ],
-        [InlineKeyboardButton(translations.get_button('back'), callback_data="back")],
-        [InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    try:
-        await context.bot.edit_message_text(
-            chat_id=context.user_data['order_chat_id'],
-            message_id=context.user_data['order_message_id'],
-            text=order_message
-        )
-    except telegram.error.BadRequest as e:
-        if "Message is not modified" in str(e):
-            pass
-        else:
-            raise e
-    
-    if isinstance(update, telegram.Update) and update.message:
-        sent_message = await update.message.reply_text(prompt_message, reply_markup=reply_markup)
-    else:
-        sent_message = await update.callback_query.message.reply_text(prompt_message, reply_markup=reply_markup)
-    
-    context.user_data['prompt_message_id'] = sent_message.message_id
-    return MEAL_TYPE
-
-def _build_dish_keyboard(
-    dishes_with_prices: List[Tuple[str, str, str]],
-    quantities: Dict[str, int],
-    prices: Dict[str, str]
-) -> List[List[InlineKeyboardButton]]:
-    """
-    Создает клавиатуру для выбора блюд.
-    
-    Args:
-        dishes_with_prices: Список кортежей (название_блюда, цена, вес)
-        quantities: Словарь количества выбранных блюд
-        prices: Словарь цен блюд
-    
-    Returns:
-        List[List[InlineKeyboardButton]]: Клавиатура с кнопками выбора блюд
-    """
-    keyboard = []
-    for dish, price, weight in dishes_with_prices:
-        quantity = quantities.get(dish, 0)
-        if quantity > 0:
-            text = f"✅ {dish} {price} р. ({weight}) ({quantity})"
-            keyboard.append([
-                InlineKeyboardButton("-", callback_data=f"quantity:{dish}:{max(0, quantity-1)}"),
-                InlineKeyboardButton(text, callback_data=f"quantity:{dish}:{quantity}"),
-                InlineKeyboardButton("+", callback_data=f"quantity:{dish}:{min(MAX_DISH_QUANTITY, quantity+1)}")
-            ])
-        else:
-            text = f"{dish} {price} р. ({weight})"
-            keyboard.append([InlineKeyboardButton(text, callback_data=f"select_dish:{dish}")])
-    
-    # Добавляем служебные кнопки
-    keyboard.append([InlineKeyboardButton(translations.get_button('done'), callback_data="done")])
-    keyboard.append([InlineKeyboardButton(translations.get_button('back'), callback_data="back")])
-    keyboard.append([InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")])
-    
-    return keyboard
-
-@profile_time
-@require_auth
 async def show_dishes(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE) -> int:
     """
     Показывает список доступных блюд и обрабатывает их выбор.
@@ -318,11 +132,14 @@ async def show_dishes(update: telegram.Update, context: telegram.ext.ContextType
     order = context.user_data.get('order', {})
     
     if action == 'meal':
-        # Инициализация нового заказа
+        # Инициализация нового заказа или обновление типа еды в существующем
         order['meal_type'] = value
-        order['dishes'] = []
-        order['quantities'] = {}
-        order['prices'] = {}
+        if 'dishes' not in order:
+            order['dishes'] = []
+        if 'quantities' not in order:
+            order['quantities'] = {}
+        if 'prices' not in order:
+            order['prices'] = {}
         order['delivery_date'] = get_delivery_date(value)
         context.user_data['order'] = order
     
@@ -698,7 +515,7 @@ async def process_order_save(update: telegram.Update, context: telegram.ext.Cont
 
 async def handle_text_input(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Обработка текстового ввода."""
-    current_state = context.user_data.get('state', NAME)
+    current_state = context.user_data.get('state', MEAL_TYPE)
     
     if current_state == WISHES:
         try:
@@ -1053,7 +870,7 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
     await query.answer()
 
     if query.data == 'new_order':
-        return await ask_room(update, context)
+        return await ask_meal_type(update, context)
     
     if query.data.startswith('edit_order:'):
         # Получаем ID заказа из callback_data
@@ -1139,8 +956,14 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
         context.user_data['order'] = saved_data
         context.user_data['editing'] = True
         
-        # Начинаем процесс редактирования с выбора комнаты
-        return await ask_room(update, context)
+        # При редактировании также берем данные из таблицы
+        user_id = str(update.effective_user.id)
+        user_data = await get_user_data(user_id)
+        context.user_data['order']['name'] = user_data['name']
+        context.user_data['order']['room'] = user_data['room']
+        
+        # Начинаем процесс редактирования с выбора типа еды
+        return await ask_meal_type(update, context)
     
     if query.data == 'cancel_order':
         # Получаем информацию о заказе
@@ -1196,7 +1019,7 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
             return MENU
     
     if query.data == 'back':
-        current_state = context.user_data.get('state', NAME)
+        current_state = context.user_data.get('state', MEAL_TYPE)
         
         # Сохраняем текущий чат и ID сообщения с информацией о заказе
         chat_id = context.user_data['order_chat_id']
@@ -1209,33 +1032,7 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
             print(f"Ошибка при удалении сообщения: {e}")
         
         # Определяем следующее состояние и отправляем соответствующее сообщение
-        if current_state == NAME:
-            # Возврат к выбору комнаты
-            context.user_data['state'] = ROOM
-            keyboard = [
-                [InlineKeyboardButton(f"{i}", callback_data=f"room:{i}") for i in range(1, 6)],
-                [InlineKeyboardButton(f"{i}", callback_data=f"room:{i}") for i in range(6, 11)],
-                [InlineKeyboardButton(f"{i}", callback_data=f"room:{i}") for i in range(11, 16)],
-                [InlineKeyboardButton(f"{i}", callback_data=f"room:{i}") for i in range(16, 21)],
-                [InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await context.bot.send_message(chat_id=chat_id, text=translations.get_message('choose_room'), reply_markup=reply_markup, parse_mode="MarkdownV2")
-            return ROOM
-            
-        elif current_state == MEAL_TYPE:
-            # Возврат к вводу имени
-            context.user_data['state'] = NAME
-            keyboard = [
-                [InlineKeyboardButton(translations.get_button('back'), callback_data="back")],
-                [InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            sent_message = await context.bot.send_message(chat_id=chat_id, text=translations.get_message('enter_name'), reply_markup=reply_markup)
-            context.user_data['prompt_message_id'] = sent_message.message_id
-            return NAME
-
-        elif current_state == DISH_SELECTION:
+        if current_state == DISH_SELECTION:
             # Возврат к выбору типа еды
             context.user_data['state'] = MEAL_TYPE
             
@@ -1259,7 +1056,6 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
                     InlineKeyboardButton(f"{translations.get_button('dinner')} ({dinner_str})", 
                                        callback_data="meal:Ужин")
                 ],
-                [InlineKeyboardButton(translations.get_button('back'), callback_data="back")],
                 [InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1282,9 +1078,10 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
         # Удаляем информационное сообщение о заказе
         try:
             if context.user_data.get('order_message_id'):
-                from orderbot.services.sheets import get_orders_sheet
-                orders_sheet = get_orders_sheet()
-                orders_sheet.delete_row(context.user_data['order_message_id'])
+                await context.bot.delete_message(
+                    chat_id=context.user_data['order_chat_id'],
+                    message_id=context.user_data['order_message_id']
+                )
         except Exception as e:
             print(f"Ошибка при удалении сообщения о заказе: {e}")
             
@@ -1318,6 +1115,9 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
         await query.edit_message_text(message, reply_markup=reply_markup)
         return MENU
     
+    if query.data.startswith('meal:'):
+        return await show_dishes(update, context)
+        
     action, value = query.data.split(':')
     if action == 'wishes' and value == 'none':
         context.user_data['order']['wishes'] = translations.get_message('no_wishes')
@@ -1370,6 +1170,144 @@ async def show_edit_active_orders(update: telegram.Update, context: telegram.ext
     return MENU
 
 @profile_time
+@require_auth
+async def ask_meal_type(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
+    """Запрос типа еды."""
+    context.user_data['state'] = MEAL_TYPE
+    
+    # Если функция вызвана после нажатия на кнопку
+    if update.callback_query:
+        query = update.callback_query
+        await query.answer()
+        
+        # Если это callback с meal:тип, обрабатываем его
+        if query.data.startswith('meal:'):
+            return await show_dishes(update, context)
+        
+        # Если мы пришли из другого места по кнопке new_order, начинаем с получения данных пользователя
+        if query.data == 'new_order':
+            # Получаем данные пользователя
+            user_id = str(update.effective_user.id)
+            user_data = await get_user_data(user_id)
+            
+            # Создаем или очищаем словарь заказа и сохраняем данные пользователя
+            if not context.user_data.get('order'):
+                context.user_data['order'] = {}
+            else:
+                context.user_data['order'].clear()
+                
+            context.user_data['order']['name'] = user_data['name']
+            context.user_data['order']['room'] = user_data['room']
+            
+            # Обновляем сообщение с формой заказа
+            order_message = await show_order_form(update, context)
+            try:
+                # Если у нас уже есть информационное сообщение, обновляем его
+                if context.user_data.get('order_message_id'):
+                    await context.bot.edit_message_text(
+                        chat_id=context.user_data['order_chat_id'],
+                        message_id=context.user_data['order_message_id'],
+                        text=order_message
+                    )
+                else:
+                    # Иначе создаем новое сообщение
+                    sent_message = await query.message.reply_text(order_message)
+                    context.user_data['order_chat_id'] = sent_message.chat_id
+                    context.user_data['order_message_id'] = sent_message.message_id
+            except Exception as e:
+                print(f"Ошибка при обновлении сообщения заказа: {e}")
+                # В случае ошибки создаем новое сообщение
+                sent_message = await query.message.reply_text(order_message)
+                context.user_data['order_chat_id'] = sent_message.chat_id
+                context.user_data['order_message_id'] = sent_message.message_id
+    
+    order_message = await show_order_form(update, context)
+    prompt_message = translations.get_message('choose_meal')
+    
+    # Получаем даты выдачи для каждого типа приема пищи
+    breakfast_date = get_delivery_date('breakfast')
+    lunch_date = get_delivery_date('lunch')
+    dinner_date = get_delivery_date('dinner')
+    
+    # Форматируем даты в строки
+    date_format = "%d.%m"
+    breakfast_str = breakfast_date.strftime(date_format)
+    lunch_str = lunch_date.strftime(date_format)
+    dinner_str = dinner_date.strftime(date_format)
+    
+    # Формируем клавиатуру с датами
+    keyboard = [
+        [
+            InlineKeyboardButton(f"{translations.get_button('breakfast')} ({breakfast_str})", 
+                               callback_data="meal:Завтрак"),
+            InlineKeyboardButton(f"{translations.get_button('lunch')} ({lunch_str})", 
+                               callback_data="meal:Обед"),
+            InlineKeyboardButton(f"{translations.get_button('dinner')} ({dinner_str})", 
+                               callback_data="meal:Ужин")
+        ],
+        [InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # Обновляем форму заказа, если она уже существует
+    if context.user_data.get('order_message_id'):
+        try:
+            await context.bot.edit_message_text(
+                chat_id=context.user_data['order_chat_id'],
+                message_id=context.user_data['order_message_id'],
+                text=order_message
+            )
+        except telegram.error.BadRequest as e:
+            if "Message is not modified" not in str(e):
+                raise e
+    
+    # Отправляем сообщение с выбором типа еды
+    if update.callback_query:
+        sent_message = await update.callback_query.message.reply_text(prompt_message, reply_markup=reply_markup)
+    else:
+        sent_message = await update.message.reply_text(prompt_message, reply_markup=reply_markup)
+    
+    context.user_data['prompt_message_id'] = sent_message.message_id
+    return MEAL_TYPE
+
+def _build_dish_keyboard(
+    dishes_with_prices: List[Tuple[str, str, str]],
+    quantities: Dict[str, int],
+    prices: Dict[str, str]
+) -> List[List[InlineKeyboardButton]]:
+    """
+    Создает клавиатуру для выбора блюд.
+    
+    Args:
+        dishes_with_prices: Список кортежей (название_блюда, цена, вес)
+        quantities: Словарь количества выбранных блюд
+        prices: Словарь цен блюд
+    
+    Returns:
+        List[List[InlineKeyboardButton]]: Клавиатура с кнопками выбора блюд
+    """
+    keyboard = []
+    for dish, price, weight in dishes_with_prices:
+        quantity = quantities.get(dish, 0)
+        if quantity > 0:
+            text = f"✅ {dish} {price} р. ({weight}) ({quantity})"
+            keyboard.append([
+                InlineKeyboardButton("-", callback_data=f"quantity:{dish}:{max(0, quantity-1)}"),
+                InlineKeyboardButton(text, callback_data=f"quantity:{dish}:{quantity}"),
+                InlineKeyboardButton("+", callback_data=f"quantity:{dish}:{min(MAX_DISH_QUANTITY, quantity+1)}")
+            ])
+        else:
+            text = f"{dish} {price} р. ({weight})"
+            keyboard.append([InlineKeyboardButton(text, callback_data=f"select_dish:{dish}")])
+    
+    # Добавляем служебные кнопки
+    keyboard.append([InlineKeyboardButton(translations.get_button('done'), callback_data="done")])
+    keyboard.append([InlineKeyboardButton(translations.get_button('back'), callback_data="back")])
+    keyboard.append([InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")])
+    
+    return keyboard
+
+@profile_time
 async def start_new_order(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE) -> int:
     """Начинает процесс создания нового заказа."""
     try:
@@ -1396,15 +1334,10 @@ async def start_new_order(update: telegram.Update, context: telegram.ext.Context
         # Очищаем данные предыдущего заказа
         context.user_data['order'] = {}
         
-        # Показываем выбор комнаты
-        keyboard = [
-            [InlineKeyboardButton(f"{i}", callback_data=f"room:{i}") for i in range(1, 6)],
-            [InlineKeyboardButton(f"{i}", callback_data=f"room:{i}") for i in range(6, 11)],
-            [InlineKeyboardButton(f"{i}", callback_data=f"room:{i}") for i in range(11, 16)],
-            [InlineKeyboardButton(f"{i}", callback_data=f"room:{i}") for i in range(16, 21)],
-            [InlineKeyboardButton(translations.get_button('cancel'), callback_data='cancel')]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        # Получаем данные пользователя из таблицы
+        user_data = await get_user_data(user_id)
+        context.user_data['order']['name'] = user_data['name']
+        context.user_data['order']['room'] = user_data['room']
         
         # Отправляем сообщение с формой заказа
         order_message = await show_order_form(update, context)
@@ -1412,9 +1345,38 @@ async def start_new_order(update: telegram.Update, context: telegram.ext.Context
         context.user_data['order_chat_id'] = sent_message.chat_id
         context.user_data['order_message_id'] = sent_message.message_id
         
-        # Отправляем сообщение с выбором комнаты
-        await update.message.reply_text(translations.get_message('choose_room'), reply_markup=reply_markup, parse_mode="MarkdownV2")
-        return ROOM
+        # Получаем даты выдачи для каждого типа приема пищи
+        breakfast_date = get_delivery_date('breakfast')
+        lunch_date = get_delivery_date('lunch')
+        dinner_date = get_delivery_date('dinner')
+        
+        # Форматируем даты в строки
+        date_format = "%d.%m"
+        breakfast_str = breakfast_date.strftime(date_format)
+        lunch_str = lunch_date.strftime(date_format)
+        dinner_str = dinner_date.strftime(date_format)
+        
+        # Формируем клавиатуру с выбором типа еды
+        keyboard = [
+            [
+                InlineKeyboardButton(f"{translations.get_button('breakfast')} ({breakfast_str})", 
+                                   callback_data="meal:Завтрак"),
+                InlineKeyboardButton(f"{translations.get_button('lunch')} ({lunch_str})", 
+                                   callback_data="meal:Обед"),
+                InlineKeyboardButton(f"{translations.get_button('dinner')} ({dinner_str})", 
+                                   callback_data="meal:Ужин")
+            ],
+            [InlineKeyboardButton(translations.get_button('cancel'), callback_data='cancel')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Отправляем сообщение с выбором типа еды
+        context.user_data['state'] = MEAL_TYPE
+        prompt_message = translations.get_message('choose_meal')
+        sent_message = await update.message.reply_text(prompt_message, reply_markup=reply_markup)
+        context.user_data['prompt_message_id'] = sent_message.message_id
+        
+        return MEAL_TYPE
         
     except Exception as e:
         print(f"Ошибка при создании нового заказа: {e}")

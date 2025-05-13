@@ -358,4 +358,44 @@ async def create_user_record(user_id: int, username: str, first_name: str, last_
         return True
     except Exception as e:
         logging.error(f"Ошибка при создании записи о пользователе: {e}")
-        return False 
+        return False
+
+async def get_user_data(user_id: str) -> dict:
+    """Получение данных пользователя (имя и номер комнаты) по его ID.
+    
+    Args:
+        user_id: ID пользователя
+        
+    Returns:
+        dict: Словарь с данными пользователя (name, room)
+    """
+    try:
+        # Сначала ищем в таблице пользователей
+        users_data = users_sheet.get_all_values()
+        user_info = {'name': '-', 'room': ''}
+        
+        # Поиск в таблице пользователей
+        for row in users_data[1:]:  # Пропускаем заголовок
+            if row[0] == user_id:
+                user_info['name'] = row[2]  # First Name
+                user_info['room'] = row[4]  # Room Number
+                break
+        
+        # Если в таблице пользователей нет имени или комнаты, проверяем Auth таблицу
+        if user_info['name'] == '-' or not user_info['room']:
+            try:
+                auth_data = auth_sheet.get_all_values()
+                for row in auth_data[1:]:  # Пропускаем заголовок
+                    if len(row) >= 4 and row[3] == user_id:  # Если находим совпадение по user_id (четвертый столбец)
+                        if user_info['name'] == '-':
+                            user_info['name'] = row[0] or '-'  # Берем имя из первого столбца
+                        if not user_info['room'] and len(row) >= 3 and row[2]:
+                            user_info['room'] = row[2]  # Берем номер комнаты из третьего столбца
+                        break
+            except Exception as e:
+                logging.error(f"Ошибка при получении данных из таблицы Auth: {e}")
+        
+        return user_info
+    except Exception as e:
+        logging.error(f"Ошибка при получении данных пользователя: {e}")
+        return {'name': '-', 'room': ''} 
