@@ -556,20 +556,13 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
     # Фильтруем только активные заказы пользователя со статусом "Активен"
     user_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] == 'Активен']
     
-    # Проверяем, есть ли у пользователя оплаченные заказы (для добавления кнопки)
-    has_paid_orders = any(row[3] == user_id and row[2] == 'Оплачен' for row in all_orders[1:])
-    
     if not user_orders:
         message = escape_markdown_v2(translations.get_message('no_active_orders'))
         keyboard = [
             [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
-            [InlineKeyboardButton(translations.get_button('orders_to_pay'), callback_data='orders_to_pay')]
+            [InlineKeyboardButton(translations.get_button('orders_to_pay'), callback_data='orders_to_pay')],
+            [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
         ]
-        # Добавляем кнопку "Оплаченные заказы", если они есть
-        if has_paid_orders:
-            keyboard.append([InlineKeyboardButton(translations.get_button('paid_orders'), callback_data='paid_orders')])
-        keyboard.append([InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')])
-        
         reply_markup = InlineKeyboardMarkup(keyboard)
         if is_command:
             await update.message.reply_text(message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
@@ -678,15 +671,11 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
             # Отправляем отдельное сообщение с кнопками
             keyboard = [
                 [InlineKeyboardButton(translations.get_button('orders_to_pay'), callback_data='orders_to_pay')],
+                [InlineKeyboardButton(translations.get_button('paid_orders'), callback_data='paid_orders')],
                 [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
                 [InlineKeyboardButton(translations.get_button('edit_active_orders'), callback_data='edit_active_orders')],
                 [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
             ]
-            # Добавляем кнопку "Оплаченные заказы", если они есть
-            if has_paid_orders:
-                keyboard.append([InlineKeyboardButton(translations.get_button('paid_orders'), callback_data='paid_orders')])
-            keyboard.append([InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')])
-            
             reply_markup = InlineKeyboardMarkup(keyboard)
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
@@ -699,15 +688,11 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
             error_message = translations.get_message('orders_display_error')
             keyboard = [
                 [InlineKeyboardButton(translations.get_button('orders_to_pay'), callback_data='orders_to_pay')],
+                [InlineKeyboardButton(translations.get_button('paid_orders'), callback_data='paid_orders')],
                 [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
                 [InlineKeyboardButton(translations.get_button('edit_active_orders'), callback_data='edit_active_orders')],
                 [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
             ]
-            # Добавляем кнопку "Оплаченные заказы", если они есть
-            if has_paid_orders:
-                keyboard.append([InlineKeyboardButton(translations.get_button('paid_orders'), callback_data='paid_orders')])
-            keyboard.append([InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')])
-            
             reply_markup = InlineKeyboardMarkup(keyboard)
             if is_command:
                 await update.message.reply_text(error_message, reply_markup=reply_markup)
@@ -1007,7 +992,7 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
     
     if query.data == 'orders_to_pay':
         return await show_orders_to_pay(update, context)
-        
+    
     if query.data == 'paid_orders':
         return await show_paid_orders(update, context)
 
@@ -1545,10 +1530,10 @@ async def show_paid_orders(update: telegram.Update, context: telegram.ext.Contex
     from orderbot.services.sheets import get_orders_sheet
     orders_sheet = get_orders_sheet()
     all_orders = orders_sheet.get_all_values()
-    # Фильтруем только оплаченные заказы пользователя
-    paid_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] == 'Оплачен']
+    # Фильтруем заказы пользователя со статусом "Оплачен"
+    user_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] == 'Оплачен']
     
-    if not paid_orders:
+    if not user_orders:
         message = escape_markdown_v2("У вас нет оплаченных заказов.")
         keyboard = [
             [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
@@ -1559,8 +1544,8 @@ async def show_paid_orders(update: telegram.Update, context: telegram.ext.Contex
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
     else:
-        # Сортируем оплаченные заказы по времени (от недавних к старым)
-        paid_orders.sort(key=lambda x: x[1], reverse=True)
+        # Сортируем заказы по дате
+        user_orders.sort(key=lambda x: x[1], reverse=True)  # Сортировка по времени создания, сначала новые
         
         messages = []
         current_message = ""
@@ -1569,8 +1554,8 @@ async def show_paid_orders(update: telegram.Update, context: telegram.ext.Contex
         # Заголовок
         messages.append(escape_markdown_v2("Ваши оплаченные заказы:"))
         
-        # Обрабатываем каждый оплаченный заказ
-        for order in paid_orders:
+        # Формируем сообщения для каждого заказа
+        for order in user_orders:
             # Формируем информацию о заказе
             delivery_date = order[11] if order[11] else None
             meal_type = order[8]
