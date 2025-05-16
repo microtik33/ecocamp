@@ -553,13 +553,14 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
     from orderbot.services.sheets import get_orders_sheet
     orders_sheet = get_orders_sheet()
     all_orders = orders_sheet.get_all_values()
-    # Фильтруем заказы пользователя со статусами "Принят", "Активен" и "Ожидает оплаты"
-    user_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] in ['Принят', 'Активен', 'Ожидает оплаты']]
+    # Фильтруем только активные заказы пользователя со статусом "Активен"
+    user_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] == 'Активен']
     
     if not user_orders:
         message = escape_markdown_v2(translations.get_message('no_active_orders'))
         keyboard = [
             [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
+            [InlineKeyboardButton(translations.get_button('orders_to_pay'), callback_data='orders_to_pay')],
             [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -568,23 +569,6 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
         else:
             await update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
     else:
-        # Сортируем заказы по приоритету статуса и времени
-        # Приоритет: "Ожидает оплаты", "Принят", "Активен"
-        def order_status_priority(status):
-            if status == 'Ожидает оплаты':
-                return 0
-            elif status == 'Принят':
-                return 1
-            else:  # Активен
-                return 2
-        
-        user_orders.sort(key=lambda x: (order_status_priority(x[2]), x[1]))
-        
-        # Разделяем заказы по статусам
-        awaiting_payment_orders = [order for order in user_orders if order[2] == 'Ожидает оплаты']
-        processing_orders = [order for order in user_orders if order[2] == 'Принят']
-        active_orders = [order for order in user_orders if order[2] == 'Активен']
-        
         # Сортируем активные заказы по типу еды: Завтрак - Обед - Ужин
         def meal_type_priority(meal_type):
             if meal_type == 'Завтрак':
@@ -595,7 +579,171 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
                 return 2
             return 3  # Для других значений
             
-        active_orders.sort(key=lambda x: meal_type_priority(x[8]))
+        user_orders.sort(key=lambda x: meal_type_priority(x[8]))
+        
+        messages = []
+        current_message = ""
+        total_sum = 0
+        
+        # Добавляем активные заказы
+        messages.append(escape_markdown_v2("Ваши заказы на завтра:"))
+        for order in user_orders:
+            # Формируем информацию о заказе
+            delivery_date = order[11] if order[11] else None
+            meal_type = order[8]
+            meal_type_with_date = f"{translations.get_meal_type(meal_type)} ({delivery_date})" if delivery_date else translations.get_meal_type(meal_type)
+            
+            # Экранируем специальные символы для Markdown V2
+            escaped_order_id = escape_markdown_v2(order[0])
+            escaped_status = escape_markdown_v2(order[2])
+            escaped_timestamp = escape_markdown_v2(order[1])
+            escaped_room = escape_markdown_v2(order[6])
+            escaped_name = escape_markdown_v2(order[7])
+            escaped_meal_type = escape_markdown_v2(meal_type_with_date)
+            
+            order_info = (
+                f"📝 Заказ *{escaped_order_id}* \\({escaped_status}\\)\n"
+                f"🏠 Комната: {escaped_room}\n"
+                f"👤 Имя: {escaped_name}\n"
+                f"🍽 Время дня: {escaped_meal_type}\n"
+                f"🍲 Блюда:\n"
+            )
+            
+            # Разбиваем строку с блюдами на отдельные блюда и форматируем каждое
+            dishes = order[9].split(', ')
+            for dish in dishes:
+                escaped_dish = escape_markdown_v2(dish)
+                order_info += f"  • {escaped_dish}\n"
+            
+            escaped_wishes = escape_markdown_v2(order[10])
+            order_info += f"📝 Пожелания: {escaped_wishes}\n"
+            
+            order_sum = int(float(order[5])) if order[5] else 0
+            total_sum += order_sum
+            escaped_sum = escape_markdown_v2(str(order_sum))
+            order_info += f"💰 Сумма заказа: {escaped_sum} р\\.\n"
+            order_info += translations.get_message('active_orders_separator')
+            
+            # Если текущее сообщение станет слишком длинным, начинаем новое
+            if len(current_message + order_info) > 3000:  # Оставляем запас для доп. текста
+                messages.append(current_message)
+                current_message = order_info
+            else:
+                current_message += order_info
+        
+        # Добавляем последнее сообщение со списком заказов, если оно есть
+        if current_message:
+            messages.append(current_message)
+        
+        # Добавляем общую сумму в последнее сообщение
+        escaped_total_sum = escape_markdown_v2(str(total_sum))
+        total_sum_message = translations.get_message('total_sum', sum=escaped_total_sum)
+        
+        # Логирование для отладки
+        logger.info(f"Итоговая сумма: {total_sum}, экранированная: {escaped_total_sum}")
+        logger.info(f"Сообщение о сумме: {total_sum_message}")
+        
+        messages[-1] += total_sum_message
+        
+        try:
+            if len(messages) == 1:
+                # Если все помещается в одно сообщение
+                message = messages[0]
+                if is_command:
+                    await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN_V2)
+                else:
+                    await update.callback_query.edit_message_text(message, parse_mode=ParseMode.MARKDOWN_V2)
+            else:
+                # Отправляем первое сообщение
+                if is_command:
+                    await update.message.reply_text(messages[0], parse_mode=ParseMode.MARKDOWN_V2)
+                else:
+                    await update.callback_query.edit_message_text(messages[0], parse_mode=ParseMode.MARKDOWN_V2)
+                
+                # Отправляем промежуточные сообщения без кнопок
+                for msg in messages[1:]:
+                    await context.bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text=msg,
+                        parse_mode=ParseMode.MARKDOWN_V2
+                    )
+            
+            # Отправляем отдельное сообщение с кнопками
+            keyboard = [
+                [InlineKeyboardButton(translations.get_button('orders_to_pay'), callback_data='orders_to_pay')],
+                [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
+                [InlineKeyboardButton(translations.get_button('edit_active_orders'), callback_data='edit_active_orders')],
+                [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=translations.get_message('what_next'),
+                reply_markup=reply_markup
+            )
+        except Exception as e:
+            logger.error(f"Ошибка при отправке списка заказов: {e}")
+            logger.exception("Подробная информация об ошибке:")
+            error_message = translations.get_message('orders_display_error')
+            keyboard = [
+                [InlineKeyboardButton(translations.get_button('orders_to_pay'), callback_data='orders_to_pay')],
+                [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
+                [InlineKeyboardButton(translations.get_button('edit_active_orders'), callback_data='edit_active_orders')],
+                [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            if is_command:
+                await update.message.reply_text(error_message, reply_markup=reply_markup)
+            else:
+                await update.callback_query.edit_message_text(error_message, reply_markup=reply_markup)
+    
+    # Устанавливаем состояние MENU для обработки кнопок
+    context.user_data['state'] = MENU
+    return MENU
+
+@profile_time
+@require_auth
+async def show_orders_to_pay(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
+    """Показ заказов, ожидающих оплаты и принятых."""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = str(update.effective_user.id)
+    
+    # Инициализируем состояние MENU, если оно не установлено
+    if 'state' not in context.user_data:
+        context.user_data['state'] = MENU
+    
+    from orderbot.services.sheets import get_orders_sheet
+    orders_sheet = get_orders_sheet()
+    all_orders = orders_sheet.get_all_values()
+    # Фильтруем заказы пользователя со статусами "Принят" и "Ожидает оплаты"
+    user_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] in ['Принят', 'Ожидает оплаты']]
+    
+    if not user_orders:
+        message = escape_markdown_v2("У вас нет заказов на оплату.")
+        keyboard = [
+            [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
+            [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
+            [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
+    else:
+        # Сортируем заказы по приоритету статуса и времени
+        # Приоритет: "Ожидает оплаты", "Принят"
+        def order_status_priority(status):
+            if status == 'Ожидает оплаты':
+                return 0
+            elif status == 'Принят':
+                return 1
+            return 2  # Для других значений
+        
+        user_orders.sort(key=lambda x: (order_status_priority(x[2]), x[1]))
+        
+        # Разделяем заказы по статусам
+        awaiting_payment_orders = [order for order in user_orders if order[2] == 'Ожидает оплаты']
+        processing_orders = [order for order in user_orders if order[2] == 'Принят']
         
         messages = []
         current_message = ""
@@ -673,58 +821,6 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
                 else:
                     current_message += order_info
         
-        # Добавляем активные заказы
-        if active_orders:
-            if current_message:  # Если есть предыдущие сообщения, добавляем разделитель
-                messages.append(current_message)
-                current_message = ""
-            
-            messages.append(escape_markdown_v2("Ваши заказы на завтра:"))
-            for order in active_orders:
-                # Формируем информацию о заказе
-                delivery_date = order[11] if order[11] else None
-                meal_type = order[8]
-                meal_type_with_date = f"{translations.get_meal_type(meal_type)} ({delivery_date})" if delivery_date else translations.get_meal_type(meal_type)
-                
-                # Экранируем специальные символы для Markdown V2
-                escaped_order_id = escape_markdown_v2(order[0])
-                escaped_status = escape_markdown_v2(order[2])
-                escaped_timestamp = escape_markdown_v2(order[1])
-                escaped_room = escape_markdown_v2(order[6])
-                escaped_name = escape_markdown_v2(order[7])
-                escaped_meal_type = escape_markdown_v2(meal_type_with_date)
-                
-                order_info = (
-                    f"✅ Заказ *{escaped_order_id}* \\({escaped_status}\\)\n"
-                    f"⏰ {escaped_timestamp}\n"
-                    f"🏠 Комната: {escaped_room}\n"
-                    f"👤 Имя: {escaped_name}\n"
-                    f"🍽 Время дня: {escaped_meal_type}\n"
-                    f"🍲 Блюда:\n"
-                )
-                
-                # Разбиваем строку с блюдами на отдельные блюда и форматируем каждое
-                dishes = order[9].split(', ')
-                for dish in dishes:
-                    escaped_dish = escape_markdown_v2(dish)
-                    order_info += f"  • {escaped_dish}\n"
-                
-                escaped_wishes = escape_markdown_v2(order[10])
-                order_info += f"📝 Пожелания: {escaped_wishes}\n"
-                
-                order_sum = int(float(order[5])) if order[5] else 0
-                total_sum += order_sum
-                escaped_sum = escape_markdown_v2(str(order_sum))
-                order_info += f"💰 Сумма заказа: {escaped_sum} р\\.\n"
-                order_info += translations.get_message('active_orders_separator')
-                
-                # Если текущее сообщение станет слишком длинным, начинаем новое
-                if len(current_message + order_info) > 3000:  # Оставляем запас для доп. текста
-                    messages.append(current_message)
-                    current_message = order_info
-                else:
-                    current_message += order_info
-        
         # Добавляем последнее сообщение со списком заказов, если оно есть
         if current_message:
             messages.append(current_message)
@@ -734,39 +830,28 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
         total_sum_message = translations.get_message('total_sum', sum=escaped_total_sum)
         
         # Логирование для отладки
-        logger.info(f"Итоговая сумма: {total_sum}, экранированная: {escaped_total_sum}")
+        logger.info(f"Итоговая сумма заказов на оплату: {total_sum}, экранированная: {escaped_total_sum}")
         logger.info(f"Сообщение о сумме: {total_sum_message}")
         
         messages[-1] += total_sum_message
         
         try:
-            if not user_orders or len(messages) == 1:
-                # Если заказов нет или все помещается в одно сообщение
-                message = messages[0] if user_orders else message
-                if is_command:
-                    await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN_V2)
-                else:
-                    await update.callback_query.edit_message_text(message, parse_mode=ParseMode.MARKDOWN_V2)
-            else:
-                # Отправляем первое сообщение
-                if is_command:
-                    await update.message.reply_text(messages[0], parse_mode=ParseMode.MARKDOWN_V2)
-                else:
-                    await update.callback_query.edit_message_text(messages[0], parse_mode=ParseMode.MARKDOWN_V2)
-                
-                # Отправляем промежуточные сообщения без кнопок
-                for msg in messages[1:]:
-                    await context.bot.send_message(
-                        chat_id=update.effective_chat.id,
-                        text=msg,
-                        parse_mode=ParseMode.MARKDOWN_V2
-                    )
+            # Отправляем первое сообщение
+            await query.edit_message_text(messages[0], parse_mode=ParseMode.MARKDOWN_V2)
+            
+            # Отправляем дополнительные сообщения
+            for msg in messages[1:]:
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=msg,
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
             
             # Отправляем отдельное сообщение с кнопками
             keyboard = [
                 [InlineKeyboardButton(translations.get_button('pay_orders'), callback_data='pay_orders')],
+                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
                 [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
-                [InlineKeyboardButton(translations.get_button('edit_active_orders'), callback_data='edit_active_orders')],
                 [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -776,19 +861,16 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
                 reply_markup=reply_markup
             )
         except Exception as e:
-            logger.error(f"Ошибка при отправке списка заказов: {e}")
+            logger.error(f"Ошибка при отправке списка заказов на оплату: {e}")
             logger.exception("Подробная информация об ошибке:")
             error_message = translations.get_message('orders_display_error')
             keyboard = [
+                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
                 [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
-                [InlineKeyboardButton(translations.get_button('edit_active_orders'), callback_data='edit_active_orders')],
                 [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            if is_command:
-                await update.message.reply_text(error_message, reply_markup=reply_markup)
-            else:
-                await update.callback_query.edit_message_text(error_message, reply_markup=reply_markup)
+            await query.edit_message_text(error_message, reply_markup=reply_markup)
     
     # Устанавливаем состояние MENU для обработки кнопок
     context.user_data['state'] = MENU
@@ -884,6 +966,9 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
     if query.data == 'new_order':
         return await ask_meal_type(update, context)
     
+    if query.data == 'orders_to_pay':
+        return await show_orders_to_pay(update, context)
+
     if query.data.startswith('edit_order:'):
         # Получаем ID заказа из callback_data
         order_id = query.data.split(':')[1]
@@ -1385,7 +1470,7 @@ async def start_new_order(update: telegram.Update, context: telegram.ext.Context
                 InlineKeyboardButton(f"{translations.get_button('dinner')} ({dinner_str})", 
                                    callback_data="meal:Ужин")
             ],
-            [InlineKeyboardButton(translations.get_button('cancel'), callback_data='cancel')]
+            [InlineKeyboardButton(translations.get_button('cancel'), callback_data="cancel")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
