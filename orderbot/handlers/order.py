@@ -583,7 +583,6 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
         
         messages = []
         current_message = ""
-        total_sum = 0
         
         # Добавляем активные заказы
         messages.append(escape_markdown_v2("Ваши заказы на завтра:"))
@@ -619,7 +618,6 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
             order_info += f"📝 Пожелания: {escaped_wishes}\n"
             
             order_sum = int(float(order[5])) if order[5] else 0
-            total_sum += order_sum
             escaped_sum = escape_markdown_v2(str(order_sum))
             order_info += f"💰 Сумма заказа: {escaped_sum} р\\.\n"
             order_info += translations.get_message('active_orders_separator')
@@ -635,15 +633,8 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
         if current_message:
             messages.append(current_message)
         
-        # Добавляем общую сумму в последнее сообщение
-        escaped_total_sum = escape_markdown_v2(str(total_sum))
-        total_sum_message = translations.get_message('total_sum', sum=escaped_total_sum)
-        
         # Логирование для отладки
-        logger.info(f"Итоговая сумма: {total_sum}, экранированная: {escaped_total_sum}")
-        logger.info(f"Сообщение о сумме: {total_sum_message}")
-        
-        messages[-1] += total_sum_message
+        logger.info(f"Всего найдено активных заказов: {len(user_orders)}")
         
         try:
             if len(messages) == 1:
@@ -1549,7 +1540,6 @@ async def show_paid_orders(update: telegram.Update, context: telegram.ext.Contex
         
         messages = []
         current_message = ""
-        total_sum = 0
         
         # Заголовок
         messages.append(escape_markdown_v2("Ваши оплаченные заказы:"))
@@ -1585,7 +1575,6 @@ async def show_paid_orders(update: telegram.Update, context: telegram.ext.Contex
             order_info += f"📝 Пожелания: {escaped_wishes}\n"
             
             order_sum = int(float(order[5])) if order[5] else 0
-            total_sum += order_sum
             escaped_sum = escape_markdown_v2(str(order_sum))
             order_info += f"💰 Сумма заказа: {escaped_sum} р\\.\n"
             order_info += translations.get_message('active_orders_separator')
@@ -1601,15 +1590,8 @@ async def show_paid_orders(update: telegram.Update, context: telegram.ext.Contex
         if current_message:
             messages.append(current_message)
         
-        # Добавляем общую сумму в последнее сообщение
-        escaped_total_sum = escape_markdown_v2(str(total_sum))
-        total_sum_message = translations.get_message('total_sum', sum=escaped_total_sum)
-        
         # Логирование для отладки
-        logger.info(f"Итоговая сумма оплаченных заказов: {total_sum}, экранированная: {escaped_total_sum}")
-        logger.info(f"Сообщение о сумме: {total_sum_message}")
-        
-        messages[-1] += total_sum_message
+        logger.info(f"Всего найдено оплаченных заказов: {len(user_orders)}")
         
         try:
             # Отправляем первое сообщение
