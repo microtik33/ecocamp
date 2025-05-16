@@ -768,12 +768,23 @@ async def show_orders_to_pay(update: telegram.Update, context: telegram.ext.Cont
                 
                 order_info = (
                     f"💸 Заказ *{escaped_order_id}* \\({escaped_status}\\)\n"
-                    f"🍽 Время: {escaped_meal_type}\n"
-                )           
+                    f"🍽 Время дня: {escaped_meal_type}\n"
+                    f"🍲 Блюда:\n"
+                )
+                
+                # Разбиваем строку с блюдами на отдельные блюда и форматируем каждое
+                dishes = order[9].split(', ')
+                for dish in dishes:
+                    escaped_dish = escape_markdown_v2(dish)
+                    order_info += f"  • {escaped_dish}\n"
+                
+                escaped_wishes = escape_markdown_v2(order[10])
+                order_info += f"📝 Пожелания: {escaped_wishes}\n"
+                
                 order_sum = int(float(order[5])) if order[5] else 0
                 total_sum += order_sum
                 escaped_sum = escape_markdown_v2(str(order_sum))
-                order_info += f"💰 Сумма: {escaped_sum} р\\.\n"
+                order_info += f"💰 Сумма заказа: {escaped_sum} р\\.\n"
                 order_info += translations.get_message('active_orders_separator')
                 
                 # Если текущее сообщение станет слишком длинным, начинаем новое
@@ -806,12 +817,23 @@ async def show_orders_to_pay(update: telegram.Update, context: telegram.ext.Cont
                 
                 order_info = (
                     f"🛎 Заказ *{escaped_order_id}* \\({escaped_status}\\)\n"
-                    f"🍽 Время: {escaped_meal_type}\n"
+                    f"🍽 Время дня: {escaped_meal_type}\n"
+                    f"🍲 Блюда:\n"
                 )
+                
+                # Разбиваем строку с блюдами на отдельные блюда и форматируем каждое
+                dishes = order[9].split(', ')
+                for dish in dishes:
+                    escaped_dish = escape_markdown_v2(dish)
+                    order_info += f"  • {escaped_dish}\n"
+                
+                escaped_wishes = escape_markdown_v2(order[10])
+                order_info += f"📝 Пожелания: {escaped_wishes}\n"
+                
                 order_sum = int(float(order[5])) if order[5] else 0
                 total_sum += order_sum
                 escaped_sum = escape_markdown_v2(str(order_sum))
-                order_info += f"💰 Сумма: {escaped_sum} р\\.\n"
+                order_info += f"💰 Сумма заказа: {escaped_sum} р\\.\n"
                 order_info += translations.get_message('active_orders_separator')
                 
                 # Если текущее сообщение станет слишком длинным, начинаем новое
