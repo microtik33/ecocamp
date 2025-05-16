@@ -24,7 +24,8 @@ from .handlers.order import (
     handle_order_time_error,
     show_edit_active_orders,
     start_new_order,
-    show_orders_to_pay
+    show_orders_to_pay,
+    show_paid_orders
 )
 from .handlers.states import PAYMENT
 from .handlers import handle_question, save_question, ask_command
@@ -173,7 +174,8 @@ async def main() -> None:
                     CallbackQueryHandler(show_dish_compositions, pattern='show_compositions'),
                     CallbackQueryHandler(back_to_main_menu, pattern='back_to_menu'),
                     CallbackQueryHandler(create_payment, pattern='pay_orders'),
-                    CallbackQueryHandler(handle_order_update, pattern='orders_to_pay')
+                    CallbackQueryHandler(handle_order_update, pattern='orders_to_pay'),
+                    CallbackQueryHandler(handle_order_update, pattern='paid_orders')
                 ],
                 MEAL_TYPE: [
                     CallbackQueryHandler(show_dishes, pattern='^meal:(Завтрак|Обед|Ужин)$'),
