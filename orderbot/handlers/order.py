@@ -53,8 +53,9 @@ async def show_order_form(update: telegram.Update, context: telegram.ext.Context
     # Формируем список блюд с количеством
     message += "🍲 Блюда:\n"
     if order.get('dishes'):
+        quantities = order.get('quantities', {})
         for dish in order['dishes']:
-            quantity = order['quantities'].get(dish, 1)
+            quantity = quantities.get(dish, 1)
             message += f"  • {dish} x{quantity}\n"
     else:
         message += "  —\n"
@@ -62,7 +63,8 @@ async def show_order_form(update: telegram.Update, context: telegram.ext.Context
     message += f"📝 Пожелания: {order.get('wishes', '—')}"
     
     if order.get('dishes') and order.get('prices'):
-        total = int(sum(float(order['prices'].get(dish, 0)) * order['quantities'].get(dish, 1) 
+        quantities = order.get('quantities', {})
+        total = int(sum(float(order['prices'].get(dish, 0)) * quantities.get(dish, 1) 
                        for dish in order['dishes']))
         message += f"\n💰 Сумма заказа: {total} р."
     
@@ -354,7 +356,8 @@ async def process_order_save(update: telegram.Update, context: telegram.ext.Cont
     username_link = f"t.me/{username}" if username != '-' else '-'
     
     # Подсчитываем общую сумму заказа
-    total = int(sum(float(order['prices'].get(dish, 0)) * order['quantities'].get(dish, 1) 
+    quantities = order.get('quantities', {})
+    total = int(sum(float(order['prices'].get(dish, 0)) * quantities.get(dish, 1) 
                    for dish in order['dishes']))
     
     # Форматируем дату выдачи в нужном формате
@@ -383,6 +386,14 @@ async def process_order_save(update: telegram.Update, context: telegram.ext.Cont
         print(f"Ошибка при форматировании даты: {e}")
         formatted_timestamp = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
     
+    # Преобразуем quantities в JSON строку
+    try:
+        import json
+        quantities_json = json.dumps(quantities)
+    except Exception as e:
+        logger.error(f"Ошибка при сериализации quantities в JSON: {e}")
+        quantities_json = "{}"
+    
     # Формируем данные для сохранения
     order_data = {
         'order_id': order['order_id'],
@@ -395,7 +406,8 @@ async def process_order_save(update: telegram.Update, context: telegram.ext.Cont
         'name': order['name'],
         'meal_type': order['meal_type'],
         'dishes': order['dishes'],
-        'quantities': order.get('quantities', {}),  # Добавляем количества
+        'quantities': quantities,  # Добавляем количества
+        'quantities_json': quantities_json,  # Добавляем сериализованные количества
         'wishes': order.get('wishes', translations.get_message('no_wishes')),
         'delivery_date': formatted_delivery_date
     }
@@ -597,6 +609,17 @@ async def get_order_info(order_id: str) -> dict:
     all_orders = orders_sheet.get_all_values()
     for row in all_orders[1:]:  # Пропускаем заголовок
         if row[0] == order_id:
+            # Пытаемся получить информацию о количествах блюд
+            quantities = {}
+            # Проверяем, есть ли дополнительная колонка с количествами (12-я колонка)
+            if len(row) > 12 and row[12]:
+                try:
+                    # Парсим JSON строку с количествами
+                    import json
+                    quantities = json.loads(row[12].replace("'", '"'))
+                except Exception as e:
+                    logger.error(f"Ошибка при парсинге количеств блюд в get_order_info: {e}")
+            
             # Формируем словарь с информацией о заказе
             order_info = {
                 'order_id': row[0],
@@ -610,7 +633,8 @@ async def get_order_info(order_id: str) -> dict:
                 'meal_type': row[8],
                 'dishes': row[9].split(', ') if row[9] else [],
                 'wishes': row[10],
-                'delivery_date': row[11]
+                'delivery_date': row[11],
+                'quantities': quantities  # Добавляем информацию о количествах
             }
             return order_info
     return None
@@ -867,19 +891,28 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
             
         if context.user_data.get('editing'):
             # Восстанавливаем оригинальный заказ
-            context.user_data['order'] = context.user_data['original_order']
+            if context.user_data.get('original_order'):
+                context.user_data['order'] = context.user_data['original_order']
             context.user_data['editing'] = False
             
             # Формируем сообщение о заказе
-            message = translations.get_message('edit_cancelled')
-            message += await show_order_form(update, context)
-            message += translations.get_message('what_next')
-            keyboard = [
-                [InlineKeyboardButton(translations.get_button('edit_order'), callback_data='edit_order')],
-                [InlineKeyboardButton(translations.get_button('cancel_order'), callback_data='cancel_order')],
-                [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
-                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')]
-            ]
+            try:
+                message = translations.get_message('edit_cancelled')
+                message += await show_order_form(update, context)
+                message += translations.get_message('what_next')
+                keyboard = [
+                    [InlineKeyboardButton(translations.get_button('edit_order'), callback_data='edit_order')],
+                    [InlineKeyboardButton(translations.get_button('cancel_order'), callback_data='cancel_order')],
+                    [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
+                    [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')]
+                ]
+            except Exception as e:
+                logger.error(f"Ошибка при формировании сообщения отмены редактирования: {e}")
+                message = translations.get_message('edit_cancelled') + translations.get_message('what_next')
+                keyboard = [
+                    [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
+                    [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')]
+                ]
         else:
             # Полная отмена заказа
             context.user_data.clear()
