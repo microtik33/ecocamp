@@ -1,7 +1,7 @@
 import telegram
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from .. import translations
 from ..services.sheets import get_orders_sheet, is_user_authorized
@@ -33,11 +33,20 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
     if 'state' not in context.user_data:
         context.user_data['state'] = MENU
     
+    # Получаем дату на завтрашний день
+    tomorrow_date = (datetime.now() + timedelta(days=1)).strftime("%d.%m.%y")
+    
     from orderbot.services.sheets import get_orders_sheet
     orders_sheet = get_orders_sheet()
     all_orders = orders_sheet.get_all_values()
-    # Фильтруем только активные заказы пользователя со статусом "Активен"
-    user_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] == 'Активен']
+    
+    # Фильтруем заказы пользователя со статусами "Активен" и "Оплачен" на завтрашний день
+    user_orders = [
+        row for row in all_orders[1:] 
+        if row[3] == user_id and 
+           row[2] in ['Активен', 'Оплачен'] and 
+           row[11] == tomorrow_date  # Проверяем дату выдачи на завтра
+    ]
     
     if not user_orders:
         message = escape_markdown_v2(translations.get_message('no_active_orders'))
@@ -85,17 +94,38 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
             escaped_name = escape_markdown_v2(order[7])
             escaped_meal_type = escape_markdown_v2(meal_type_with_date)
             
+            # Выбираем эмодзи в зависимости от статуса
+            status_emoji = "📅"  # По умолчанию для "Активен"
+            if order[2] == 'Оплачен':
+                status_emoji = "✅"
+            
             order_info = (
-                f"📅 Заказ *{escaped_order_id}* \\({escaped_status}\\)\n"
+                f"{status_emoji} Заказ *{escaped_order_id}* \\({escaped_status}\\)\n"
                 f"🍽 Время дня: {escaped_meal_type}\n"
                 f"🍲 Блюда:\n"
             )
             
             # Разбиваем строку с блюдами на отдельные блюда и форматируем каждое
             dishes = order[9].split(', ')
+            
+            # Получаем количества, если они доступны
+            has_quantities = False
+            quantities = {}
+            
+            # Проверяем, есть ли дополнительная колонка с количествами (12-я колонка)
+            if len(order) > 12 and order[12]:
+                try:
+                    # Парсим JSON строку с количествами
+                    import json
+                    quantities = json.loads(order[12].replace("'", '"'))
+                    has_quantities = True
+                except Exception as e:
+                    logger.error(f"Ошибка при парсинге количеств блюд: {e}")
+            
             for dish in dishes:
                 escaped_dish = escape_markdown_v2(dish)
-                order_info += f"  • {escaped_dish}\n"
+                quantity = quantities.get(dish, 1) if has_quantities else 1
+                order_info += f"  • {escaped_dish} x{quantity}\n"
             
             escaped_wishes = escape_markdown_v2(order[10])
             order_info += f"📝 Пожелания: {escaped_wishes}\n"
@@ -117,7 +147,7 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
             messages.append(current_message)
         
         # Логирование для отладки
-        logger.info(f"Всего найдено активных заказов: {len(user_orders)}")
+        logger.info(f"Всего найдено заказов на завтра: {len(user_orders)}")
         
         try:
             if len(messages) == 1:
@@ -675,17 +705,28 @@ async def show_edit_active_orders(update: telegram.Update, context: telegram.ext
     await query.answer()
     
     user_id = str(update.effective_user.id)
+    
+    # Получаем дату на завтрашний день
+    tomorrow_date = (datetime.now() + timedelta(days=1)).strftime("%d.%m.%y")
+    
     from orderbot.services.sheets import get_orders_sheet
     orders_sheet = get_orders_sheet()
     all_orders = orders_sheet.get_all_values()
-    # Фильтруем только активные заказы
-    editable_orders = [row for row in all_orders[1:] if row[3] == user_id and row[2] == 'Активен']
+    
+    # Фильтруем только активные заказы на завтрашний день
+    editable_orders = [
+        row for row in all_orders[1:] 
+        if row[3] == user_id and 
+           row[2] == 'Активен' and 
+           row[11] == tomorrow_date  # Проверяем дату выдачи на завтра
+    ]
     
     if not editable_orders:
         message = translations.get_message('no_active_orders')
         keyboard = [
             [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
-            [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
+            [InlineKeyboardButton(translations.get_button('today_orders'), callback_data='today_orders')],
+            [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(message, reply_markup=reply_markup)
