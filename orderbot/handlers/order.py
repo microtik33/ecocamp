@@ -639,10 +639,6 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
         from .my_orders import show_user_orders
         return await show_user_orders(update, context)
 
-    if query.data == 'today_orders':
-        from .my_orders import show_today_orders
-        return await show_today_orders(update, context)
-
     if query.data.startswith('edit_order:'):
         # Получаем ID заказа из callback_data
         order_id = query.data.split(':')[1]
