@@ -14,7 +14,6 @@ from .handlers.menu import start, show_tomorrow_menu, show_dish_compositions, ba
 from .handlers.order import (
     PHONE, MENU, MEAL_TYPE, 
     DISH_SELECTION, WISHES, QUESTION,
-    show_user_orders,
     cancel_order,
     handle_order_update,
     ask_meal_type,
@@ -22,10 +21,13 @@ from .handlers.order import (
     handle_dish_selection,
     handle_text_input,
     handle_order_time_error,
-    show_edit_active_orders,
-    start_new_order,
+    start_new_order
+)
+from .handlers.my_orders import (
+    show_user_orders,
     show_orders_to_pay,
-    show_paid_orders
+    show_paid_orders,
+    show_edit_active_orders
 )
 from .handlers.states import PAYMENT
 from .handlers import handle_question, save_question, ask_command
