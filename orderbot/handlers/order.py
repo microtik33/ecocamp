@@ -1228,7 +1228,8 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
             message = translations.get_message('new_order_cancelled')
             keyboard = [
                 [InlineKeyboardButton(translations.get_button('make_order'), callback_data='new_order')],
-                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')]
+                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
+                [InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]
             ]
         
         reply_markup = InlineKeyboardMarkup(keyboard)
