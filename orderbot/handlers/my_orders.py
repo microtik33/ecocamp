@@ -95,7 +95,7 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
             escaped_meal_type = escape_markdown_v2(meal_type_with_date)
             
             # Выбираем эмодзи в зависимости от статуса
-            status_emoji = "📅"  # По умолчанию для "Активен"
+            status_emoji = "✏️"  # По умолчанию для "Активен"
             if order[2] == 'Оплачен':
                 status_emoji = "✅"
             
