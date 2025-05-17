@@ -85,9 +85,7 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
             escaped_meal_type = escape_markdown_v2(meal_type_with_date)
             
             order_info = (
-                f"📝 Заказ *{escaped_order_id}* \\({escaped_status}\\)\n"
-                f"🏠 Комната: {escaped_room}\n"
-                f"👤 Имя: {escaped_name}\n"
+                f"📅 Заказ *{escaped_order_id}* \\({escaped_status}\\)\n"
                 f"🍽 Время дня: {escaped_meal_type}\n"
                 f"🍲 Блюда:\n"
             )
