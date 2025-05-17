@@ -79,7 +79,7 @@ async def save_question(update: telegram.Update, context: telegram.ext.ContextTy
     phone = '-'
     for row in users_data[1:]:  # Пропускаем заголовок
         if row[0] == user_id:
-            phone = row[4]  # Phone Number
+            phone = row[3]  # Phone Number
             # Добавляем "+" к номеру телефона, если его еще нет
             if phone and phone != '-' and not phone.startswith('+'):
                 phone = f"+{phone}"
