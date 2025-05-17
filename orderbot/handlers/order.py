@@ -562,7 +562,7 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
             [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
             [InlineKeyboardButton(translations.get_button('orders_to_pay'), callback_data='orders_to_pay')],
             [InlineKeyboardButton(translations.get_button('paid_orders'), callback_data='paid_orders')],
-            [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
+            [InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         if is_command:
@@ -666,7 +666,7 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
                 [InlineKeyboardButton(translations.get_button('orders_to_pay'), callback_data='orders_to_pay')],
                 [InlineKeyboardButton(translations.get_button('paid_orders'), callback_data='paid_orders')],
                 [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
-                [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
+                [InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await context.bot.send_message(
