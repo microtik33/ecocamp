@@ -662,9 +662,9 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
             
             # Отправляем отдельное сообщение с кнопками
             keyboard = [
+                [InlineKeyboardButton(translations.get_button('edit_active_orders'), callback_data='edit_active_orders')],                
                 [InlineKeyboardButton(translations.get_button('orders_to_pay'), callback_data='orders_to_pay')],
                 [InlineKeyboardButton(translations.get_button('paid_orders'), callback_data='paid_orders')],
-                [InlineKeyboardButton(translations.get_button('edit_active_orders'), callback_data='edit_active_orders')],
                 [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
                 [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
             ]
@@ -679,10 +679,10 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
             logger.exception("Подробная информация об ошибке:")
             error_message = translations.get_message('orders_display_error')
             keyboard = [
+                [InlineKeyboardButton(translations.get_button('edit_active_orders'), callback_data='edit_active_orders')],                
                 [InlineKeyboardButton(translations.get_button('orders_to_pay'), callback_data='orders_to_pay')],
                 [InlineKeyboardButton(translations.get_button('paid_orders'), callback_data='paid_orders')],
                 [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
-                [InlineKeyboardButton(translations.get_button('edit_active_orders'), callback_data='edit_active_orders')],
                 [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -880,7 +880,7 @@ async def show_orders_to_pay(update: telegram.Update, context: telegram.ext.Cont
             logger.exception("Подробная информация об ошибке:")
             error_message = translations.get_message('orders_display_error')
             keyboard = [
-                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
+                [InlineKeyboardButton(translations.get_button('back_to_orders'), callback_data='my_orders')],
                 [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
                 [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
             ]
@@ -1220,8 +1220,7 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
                 [InlineKeyboardButton(translations.get_button('edit_order'), callback_data='edit_order')],
                 [InlineKeyboardButton(translations.get_button('cancel_order'), callback_data='cancel_order')],
                 [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
-                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
-                [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
+                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')]
             ]
         else:
             # Полная отмена заказа
@@ -1229,8 +1228,7 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
             message = translations.get_message('new_order_cancelled')
             keyboard = [
                 [InlineKeyboardButton(translations.get_button('make_order'), callback_data='new_order')],
-                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
-                [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
+                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')]
             ]
         
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1527,10 +1525,9 @@ async def show_paid_orders(update: telegram.Update, context: telegram.ext.Contex
     if not user_orders:
         message = escape_markdown_v2("У вас нет оплаченных заказов.")
         keyboard = [
-            [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
+            [InlineKeyboardButton(translations.get_button('back_to_orders'), callback_data='my_orders')],
             [InlineKeyboardButton(translations.get_button('orders_to_pay'), callback_data='orders_to_pay')],
-            [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
-            [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
+            [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
@@ -1607,10 +1604,9 @@ async def show_paid_orders(update: telegram.Update, context: telegram.ext.Contex
             
             # Отправляем отдельное сообщение с кнопками
             keyboard = [
-                [InlineKeyboardButton(translations.get_button('my_orders'), callback_data='my_orders')],
+                [InlineKeyboardButton(translations.get_button('back_to_orders'), callback_data='my_orders')],
                 [InlineKeyboardButton(translations.get_button('orders_to_pay'), callback_data='orders_to_pay')],
-                [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')],
-                [InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]
+                [InlineKeyboardButton(translations.get_button('new_order'), callback_data='new_order')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await context.bot.send_message(
