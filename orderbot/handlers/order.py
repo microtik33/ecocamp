@@ -729,6 +729,12 @@ async def handle_order_update(update: telegram.Update, context: telegram.ext.Con
         context.user_data['order']['name'] = user_data['name']
         context.user_data['order']['room'] = user_data['room']
         
+        # Инициализируем переменные для отслеживания формы заказа
+        message = await show_order_form(update, context)
+        sent_message = await query.message.reply_text(message)
+        context.user_data['order_chat_id'] = sent_message.chat_id
+        context.user_data['order_message_id'] = sent_message.message_id
+        
         # Начинаем процесс редактирования с выбора типа еды
         return await ask_meal_type(update, context)
     
@@ -978,8 +984,14 @@ async def ask_meal_type(update: telegram.Update, context: telegram.ext.ContextTy
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # Обновляем форму заказа, если она уже существует
-    if context.user_data.get('order_message_id'):
+    # Создаем новое сообщение заказа, если его еще нет
+    if not context.user_data.get('order_message_id') and update.callback_query:
+        sent_message = await update.callback_query.message.reply_text(order_message)
+        context.user_data['order_chat_id'] = sent_message.chat_id
+        context.user_data['order_message_id'] = sent_message.message_id
+        logger.info(f"Создано новое сообщение с формой заказа ID: {sent_message.message_id}")
+    # Обновляем существующее сообщение заказа
+    elif context.user_data.get('order_message_id'):
         try:
             await context.bot.edit_message_text(
                 chat_id=context.user_data['order_chat_id'],
@@ -987,8 +999,14 @@ async def ask_meal_type(update: telegram.Update, context: telegram.ext.ContextTy
                 text=order_message
             )
         except telegram.error.BadRequest as e:
-            if "Message is not modified" not in str(e):
-                raise e
+            # Если сообщение не найдено или другая ошибка, создаем новое сообщение
+            if "Message to edit not found" in str(e) and update.callback_query:
+                sent_message = await update.callback_query.message.reply_text(order_message)
+                context.user_data['order_chat_id'] = sent_message.chat_id
+                context.user_data['order_message_id'] = sent_message.message_id
+                logger.info(f"Создано новое сообщение взамен не найденного: {sent_message.message_id}")
+            elif "Message is not modified" not in str(e):
+                logger.error(f"Ошибка при обновлении сообщения: {e}")
     
     # Отправляем сообщение с выбором типа еды
     if update.callback_query:
