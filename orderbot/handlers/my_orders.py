@@ -184,7 +184,7 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
             reply_markup = InlineKeyboardMarkup(keyboard)
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=translations.get_message('what_next'),
+                text=translations.get_message('choose_action'),
                 reply_markup=reply_markup
             )
         except Exception as e:
@@ -357,7 +357,7 @@ async def show_today_orders(update: telegram.Update, context: telegram.ext.Conte
             reply_markup = InlineKeyboardMarkup(keyboard)
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=translations.get_message('what_next'),
+                text=translations.get_message('choose_action'),
                 reply_markup=reply_markup
             )
         except Exception as e:
@@ -552,7 +552,7 @@ async def show_orders_to_pay(update: telegram.Update, context: telegram.ext.Cont
             reply_markup = InlineKeyboardMarkup(keyboard)
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=translations.get_message('what_next'),
+                text=translations.get_message('pay_message'),
                 reply_markup=reply_markup
             )
         except Exception as e:
@@ -679,7 +679,7 @@ async def show_paid_orders(update: telegram.Update, context: telegram.ext.Contex
             reply_markup = InlineKeyboardMarkup(keyboard)
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=translations.get_message('what_next'),
+                text=translations.get_message('choose_action'),
                 reply_markup=reply_markup
             )
         except Exception as e:
