@@ -499,7 +499,7 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
             
             # Обновляем статистику пользователя
             try:
-                await update_user_stats(user_data['payment'].get('user_id', ''))
+                await update_user_stats(str(user_data['payment'].get('user_id', '')))
                 logger.info(f"Статистика пользователя обновлена после успешной оплаты")
             except Exception as e:
                 logger.error(f"Ошибка при обновлении статистики пользователя: {e}")
@@ -738,7 +738,7 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             
             # Обновляем статистику пользователя
             try:
-                await update_user_stats(str(update.effective_user.id))
+                await update_user_stats(str(context.user_data['payment'].get('user_id', '')))
                 logger.info(f"Статистика пользователя обновлена после успешной оплаты")
             except Exception as e:
                 logger.error(f"Ошибка при обновлении статистики пользователя: {e}")
