@@ -151,8 +151,12 @@ async def update_user_totals():
 async def update_user_stats(user_id: str):
     """Обновление статистики пользователя."""
     try:
+        # Логирование входных параметров
+        logging.info(f"Вызов update_user_stats с user_id: '{user_id}', тип: {type(user_id)}")
+        
         # Получаем все заказы
         all_orders = orders_sheet.get_all_values()
+        logging.info(f"Получено {len(all_orders)-1} заказов (без учета заголовка)")
         
         # Подсчитываем статистику пользователя
         active_orders = 0
@@ -164,8 +168,21 @@ async def update_user_stats(user_id: str):
         # Создаем словарь для подсчета статусов
         status_counts = {}
         
+        # Подсчитываем заказы пользователя
+        user_orders_count = 0
         for order in all_orders[1:]:  # Пропускаем заголовок
             if order[3] == user_id:  # User ID в четвертом столбце
+                user_orders_count += 1
+        
+        logging.info(f"Найдено {user_orders_count} заказов для пользователя {user_id}")
+        
+        for order in all_orders[1:]:  # Пропускаем заголовок
+            order_user_id = order[3]
+            # Логируем информацию для отладки
+            if order_user_id == user_id:
+                logging.info(f"Найден заказ для user_id={user_id}: ID заказа={order[0]}, статус={order[2]}")
+            
+            if order_user_id == user_id:  # User ID в четвертом столбце
                 try:
                     # Парсим дату в формате DD.MM.YYYY HH:MM:SS
                     order_date = datetime.strptime(order[1], "%d.%m.%Y %H:%M:%S")
@@ -202,6 +219,10 @@ async def update_user_stats(user_id: str):
                 else:
                     logging.info(f"Заказ {order[0]} со статусом '{status}' НЕ учтен (неизвестный статус)")
         
+        # Если у пользователя нет заказов, возможно его ID некорректный
+        if user_orders_count == 0:
+            logging.warning(f"Для пользователя с ID '{user_id}' не найдено ни одного заказа")
+        
         # Логируем статистику по статусам
         logging.info(f"Статистика по статусам заказов для пользователя {user_id}:")
         for status, count in status_counts.items():
@@ -212,16 +233,80 @@ async def update_user_stats(user_id: str):
         
         # Получаем текущие данные пользователя
         users_data = users_sheet.get_all_values()
+        logging.info(f"Получено {len(users_data)-1} записей пользователей (без учета заголовка)")
+        
+        # Ищем пользователя по ID
         user_row = None
         for idx, row in enumerate(users_data):
-            if row[0] == user_id:
+            row_user_id = row[0]
+            logging.info(f"Проверка строки {idx+1}: user_id='{row_user_id}', тип={type(row_user_id)}, сравнение с '{user_id}' = {row_user_id == user_id}")
+            if row_user_id == user_id:
                 user_row = idx + 1
+                logging.info(f"Найден пользователь в строке {user_row}")
                 break
         
+        # Если пользователь не найден, создаем новую запись
+        if not user_row:
+            logging.warning(f"Пользователь с ID '{user_id}' не найден в таблице Users")
+            
+            # Попытка получить данные пользователя из заказов
+            username = '-'
+            profile_link = '-'
+            
+            # Ищем имя пользователя в заказах
+            for order in all_orders[1:]:
+                if order[3] == user_id:
+                    username = order[4] or '-'  # Username в пятом столбце
+                    break
+            
+            # Проверяем наличие имени пользователя в auth_sheet
+            auth_name = '-'
+            room_number = ''
+            try:
+                auth_data = auth_sheet.get_all_values()
+                for row in auth_data[1:]:  # Пропускаем заголовок
+                    if len(row) >= 4 and row[3] == user_id:  # Если находим совпадение по user_id (четвертый столбец)
+                        auth_name = row[0] or '-'  # Берем имя из первого столбца
+                        if len(row) >= 3 and row[2]:  # Проверяем наличие номера комнаты
+                            room_number = row[2]  # Берем номер комнаты из третьего столбца
+                        break
+            except Exception as e:
+                logging.error(f"Ошибка при получении данных из таблицы Auth: {e}")
+            
+            # Формируем profile_link, если есть username
+            if username != '-':
+                profile_link = f"t.me/{username}"
+            
+            logging.info(f"Создаем новую запись для пользователя {user_id} с именем {auth_name} и комнатой {room_number}")
+            
+            # Добавляем новую запись пользователя
+            next_row = len(users_data) + 1
+            new_user_row = [
+                user_id,
+                profile_link,
+                auth_name,      # Имя из таблицы Auth
+                '',             # Phone Number
+                room_number,    # Room Number
+                str(active_orders),  # Orders Count - сразу заполняем текущими значениями
+                str(cancelled_orders),  # Cancellations
+                str(int(total_sum)),  # Total Sum
+                str(int(unpaid_sum)),  # Unpaid Sum
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),  # Start Time
+                last_order_date.strftime("%d.%m.%Y %H:%M:%S") if last_order_date else ''  # Last Order Date
+            ]
+            
+            # Используем явное указание диапазона для добавления новой строки
+            users_sheet.update(f'A{next_row}:K{next_row}', [new_user_row], value_input_option='USER_ENTERED')
+            logging.info(f"Новый пользователь {user_id} добавлен в строку {next_row} со статистикой: активных заказов {active_orders}, отмен {cancelled_orders}, сумма {total_sum}, неоплаченная сумма {unpaid_sum}")
+            
+            # Успешно обновили через создание новой записи
+            return True
+        
+        # Пользователь найден, обновляем его данные
         if user_row:
             # Форматируем дату для сохранения в том же формате DD.MM.YYYY HH:MM:SS
             formatted_date = last_order_date.strftime("%d.%m.%Y %H:%M:%S") if last_order_date else ''
-            logging.info(f"Обновление статистики для пользователя {user_id}: активных заказов {active_orders}, отмен {cancelled_orders}, общая сумма {total_sum}, неоплаченная сумма {unpaid_sum}, последний заказ {formatted_date}")
+            logging.info(f"Обновление статистики для пользователя {user_id} в строке {user_row}: активных заказов {active_orders}, отмен {cancelled_orders}, общая сумма {total_sum}, неоплаченная сумма {unpaid_sum}, последний заказ {formatted_date}")
             
             # Обновляем статистику (смещено влево из-за удаления колонки Last Name)
             # F-I: Orders Count, Cancellations, Total Sum, Unpaid Sum
@@ -231,15 +316,27 @@ async def update_user_stats(user_id: str):
                                str(int(total_sum)),
                                str(int(unpaid_sum))]],  # Добавляем неоплаченную сумму
                              value_input_option='USER_ENTERED')
+            logging.info(f"Ячейки F{user_row}:I{user_row} обновлены. Записаны значения: [{active_orders}, {cancelled_orders}, {int(total_sum)}, {int(unpaid_sum)}]")
             
             # Отдельно обновляем дату последнего заказа (теперь в столбце K)
             if formatted_date:
                 users_sheet.update_cell(user_row, 11, formatted_date)
+                logging.info(f"Ячейка K{user_row} (дата последнего заказа) обновлена на {formatted_date}")
+        else:
+            logging.error(f"Пользователь с ID '{user_id}' не найден в таблице Users")
+            # Если пользователь не найден, пробуем создать запись о нем
+            logging.info(f"Попытка создать новую запись для пользователя {user_id}")
+            result = await update_user_info_by_id(user_id)
+            if result:
+                logging.info(f"Создана новая запись о пользователе {user_id}")
+            else:
+                logging.error(f"Не удалось создать запись о пользователе {user_id}")
+                return False
         
         logging.info(f"Обновлена статистика пользователей в таблице Users")
         return True
     except Exception as e:
-        logging.error(f"Ошибка при обновлении статистики пользователя: {e}")
+        logging.error(f"Ошибка при обновлении статистики пользователя {user_id}: {e}")
         return False
 
 async def update_user_info_by_id(user_id: str):

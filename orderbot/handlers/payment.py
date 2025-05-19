@@ -499,8 +499,22 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
             
             # Обновляем статистику пользователя
             try:
-                await update_user_stats(str(user_data['payment'].get('user_id', '')))
-                logger.info(f"Статистика пользователя обновлена после успешной оплаты")
+                # Получаем user_id из контекста платежа
+                payment_user_id = str(user_data['payment'].get('user_id', ''))
+                
+                # Проверяем, что user_id не пустой
+                if not payment_user_id:
+                    logger.error(f"ID пользователя отсутствует в данных платежа. Невозможно обновить статистику.")
+                else:
+                    logger.info(f"Получен ID пользователя для обновления статистики: '{payment_user_id}' (тип: {type(payment_user_id)})")
+                    # Убеждаемся, что user_id - строка и удаляем возможные окружающие пробелы
+                    payment_user_id = payment_user_id.strip()
+                    # Вызываем функцию обновления статистики
+                    update_result = await update_user_stats(payment_user_id)
+                    if update_result:
+                        logger.info(f"Статистика пользователя с ID {payment_user_id} успешно обновлена после оплаты")
+                    else:
+                        logger.error(f"Ошибка при обновлении статистики пользователя с ID {payment_user_id} после оплаты")
             except Exception as e:
                 logger.error(f"Ошибка при обновлении статистики пользователя: {e}")
             
@@ -738,8 +752,22 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             
             # Обновляем статистику пользователя
             try:
-                await update_user_stats(str(context.user_data['payment'].get('user_id', '')))
-                logger.info(f"Статистика пользователя обновлена после успешной оплаты")
+                # Получаем user_id из контекста платежа
+                payment_user_id = str(context.user_data['payment'].get('user_id', ''))
+                
+                # Проверяем, что user_id не пустой
+                if not payment_user_id:
+                    logger.error(f"ID пользователя отсутствует в данных платежа. Невозможно обновить статистику.")
+                else:
+                    logger.info(f"Получен ID пользователя для обновления статистики: '{payment_user_id}' (тип: {type(payment_user_id)})")
+                    # Убеждаемся, что user_id - строка и удаляем возможные окружающие пробелы
+                    payment_user_id = payment_user_id.strip()
+                    # Вызываем функцию обновления статистики
+                    update_result = await update_user_stats(payment_user_id)
+                    if update_result:
+                        logger.info(f"Статистика пользователя с ID {payment_user_id} успешно обновлена после оплаты")
+                    else:
+                        logger.error(f"Ошибка при обновлении статистики пользователя с ID {payment_user_id} после оплаты")
             except Exception as e:
                 logger.error(f"Ошибка при обновлении статистики пользователя: {e}")
             
