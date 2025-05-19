@@ -15,7 +15,7 @@ from ..services.sheets import get_orders_sheet, update_order, save_payment_info,
 from ..config import TOCHKA_ACCOUNT_ID, TOCHKA_MERCHANT_ID, TOCHKA_JWT_TOKEN
 from ..utils.auth_decorator import require_auth
 from .states import MENU, PAYMENT
-from ..services.user import get_user_data
+from ..services.user import get_user_data, update_user_stats
 
 # Настройка логгера
 logger = logging.getLogger(__name__)
@@ -497,6 +497,13 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
             payments_sheet = get_payments_sheet()
             await update_payment_status(payments_sheet, user_data['payment'].get('payment_id', ''), "оплачено")
             
+            # Обновляем статистику пользователя
+            try:
+                await update_user_stats(user_data['payment'].get('user_id', ''))
+                logger.info(f"Статистика пользователя обновлена после успешной оплаты")
+            except Exception as e:
+                logger.error(f"Ошибка при обновлении статистики пользователя: {e}")
+            
             # Удаляем сообщение с QR-кодом, если оно есть
             try:
                 if 'qr_message_id' in user_data['payment']:
@@ -728,6 +735,13 @@ async def check_payment_status(update: Update, context: ContextTypes.DEFAULT_TYP
             # Обновляем статус оплаты в таблице
             payments_sheet = get_payments_sheet()
             await update_payment_status(payments_sheet, context.user_data['payment'].get('payment_id', ''), "оплачено")
+            
+            # Обновляем статистику пользователя
+            try:
+                await update_user_stats(str(update.effective_user.id))
+                logger.info(f"Статистика пользователя обновлена после успешной оплаты")
+            except Exception as e:
+                logger.error(f"Ошибка при обновлении статистики пользователя: {e}")
             
             # Удаляем сообщение с QR-кодом, если оно есть
             try:
