@@ -156,8 +156,12 @@ async def create_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             'status_checks': 0,  # Счетчик проверок статуса
             'payment_id': last_payment_id,  # ID оплаты в таблице
             'chat_id': update.effective_chat.id,  # Сохраняем ID чата
-            'room': room_number  # Сохраняем номер комнаты
+            'room': room_number,  # Сохраняем номер комнаты
+            'user_id': str(update.effective_user.id)  # Важно: сохраняем ID пользователя
         }
+        
+        # Логируем данные платежа для отладки
+        logger.info(f"Создан платеж с данными: qrc_id={qr_data['qrcId']}, amount={total_sum}, payment_id={last_payment_id}, user_id={update.effective_user.id}")
         
         # Декодируем изображение QR-кода из base64
         qr_image_data = qr_data.get('image', {}).get('content', '')
@@ -367,6 +371,32 @@ async def auto_check_payment_status(context: ContextTypes.DEFAULT_TYPE) -> None:
             except Exception as e:
                 logger.error(f"Ошибка при остановке задачи автопроверки: {e}")
             return
+        
+        # Логируем данные платежа для отладки
+        logger.info(f"Данные платежа: {user_data['payment']}")
+        
+        # Проверяем наличие ID пользователя в данных платежа
+        if 'user_id' not in user_data['payment']:
+            logger.warning(f"В данных платежа отсутствует user_id! Попытка восстановить из заказов.")
+            
+            # Попытка получить user_id из заказов
+            try:
+                if 'orders' in user_data['payment']:
+                    orders = user_data['payment']['orders']
+                    if orders:
+                        orders_sheet = get_orders_sheet()
+                        all_orders = orders_sheet.get_all_values()
+                        
+                        # Ищем заказ по ID и извлекаем user_id
+                        for order in all_orders[1:]:  # Пропускаем заголовок
+                            if order[0] in orders:  # ID заказа в первом столбце
+                                user_id = order[3]  # User ID в четвертом столбце
+                                # Сохраняем ID пользователя в данных платежа
+                                user_data['payment']['user_id'] = user_id
+                                logger.info(f"Восстановлен user_id={user_id} из заказа {order[0]}")
+                                break
+            except Exception as e:
+                logger.error(f"Ошибка при попытке восстановить user_id из заказов: {e}")
         
         # Увеличиваем счетчик проверок
         user_data['payment']['status_checks'] += 1

@@ -371,4 +371,72 @@ async def test_update_user_stats_updates_user_data_properly():
                         mock_update_cell.assert_called()
                         
                         # Проверяем логирование
-                        mock_logging.assert_any_call(f"Обновлена статистика пользователей в таблице Users") 
+                        mock_logging.assert_any_call(f"Обновлена статистика пользователей в таблице Users")
+
+@pytest.mark.asyncio
+async def test_auto_check_payment_status_recovers_missing_user_id():
+    """Тест проверяет восстановление отсутствующего user_id из данных заказа."""
+    # Создаем мок для контекста
+    mock_context = MagicMock()
+    mock_context.bot = MagicMock()
+    mock_context.bot.edit_message_text = AsyncMock()
+    mock_context.bot.delete_message = AsyncMock()
+    mock_context.bot.send_message = AsyncMock()
+    
+    # Тестовый ID пользователя, который будет восстановлен из заказа
+    test_user_id = '456'
+    
+    # Создаем мок для данных платежа БЕЗ user_id
+    user_data = {
+        'payment': {
+            'qrc_id': 'test_qrc_id',
+            'orders': ['1', '2'],  # Список ID заказов
+            'buttons_message_id': 789,
+            'qr_message_id': 101,
+            'status_checks': 0,
+            'payment_id': '1'
+            # user_id отсутствует
+        }
+    }
+    
+    # Создаем мок для job
+    job = MagicMock()
+    job.data = {
+        'chat_id': 123,
+        'user_data': user_data
+    }
+    mock_context.job = job
+    mock_context.job_queue = MagicMock()
+    mock_context.job_queue.get_jobs_by_name = MagicMock(return_value=[MagicMock()])
+    
+    # Мок заказов для восстановления user_id
+    mock_orders = [
+        ['id', 'date', 'status', 'user_id', 'username', 'sum'],  # Заголовок
+        ['1', '01.01.2023 12:00:00', 'Принят', test_user_id, 'user1', '100'],  # Первый заказ с нужным ID
+        ['2', '02.01.2023 13:00:00', 'Активен', test_user_id, 'user1', '200']  # Второй заказ с нужным ID
+    ]
+    
+    # Создаем мок для update_user_stats
+    with patch('orderbot.services.user.update_user_stats') as mock_update_user_stats:
+        # Настраиваем mock_update_user_stats.return_value
+        mock_update_user_stats.return_value = True
+        
+        # Мокаем получение заказов для восстановления user_id
+        with patch('orderbot.services.sheets.get_orders_sheet') as mock_get_orders_sheet:
+            mock_orders_sheet = MagicMock()
+            mock_orders_sheet.get_all_values.return_value = mock_orders
+            mock_get_orders_sheet.return_value = mock_orders_sheet
+            
+            # Мокаем остальные внешние функции
+            with patch('orderbot.services.sbp.get_qr_code_status', return_value={'status': 'accepted', 'message': 'Payment successful'}):
+                with patch('orderbot.services.sheets.get_payments_sheet'):
+                    with patch('orderbot.handlers.payment.update_payment_status'):
+                        # Вызываем функцию
+                        await auto_check_payment_status(mock_context)
+                        
+                        # Проверяем, что user_id был восстановлен и добавлен в данные платежа
+                        assert 'user_id' in user_data['payment']
+                        assert user_data['payment']['user_id'] == test_user_id
+                        
+                        # Проверяем, что update_user_stats была вызвана с восстановленным user_id
+                        mock_update_user_stats.assert_called_once_with(test_user_id) 
