@@ -21,9 +21,7 @@ async def setup_commands_for_user(bot, user_id=None, is_cook=False):
             BotCommand("kitchen", "Сводка для кухни"),
             BotCommand("update", "Обновить кэши меню"),
             BotCommand("stats", "Статистика производительности"),
-            BotCommand("clearstats", "Очистить статистику производительности"),
-            BotCommand("memory", "Статистика использования памяти"),
-            BotCommand("funcstats", "Детальная статистика функции")
+            BotCommand("clearstats", "Очистить статистику производительности")
         ]
         base_commands.extend(cook_commands)
     
