@@ -184,7 +184,7 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
             dishes_list = []
             if order_found[9]:
                 dishes = order_found[9].split(',')
-                dishes_text = "🍲 Блюда:\n"
+                dishes_text = "🍲 Блюда:\n\n"
                 for dish in dishes:
                     dish = dish.strip()
                     dishes_text += f"- {dish}\n"
@@ -193,7 +193,7 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
                 dishes_list.append("🍲 Блюда: -\n")
             
             # Добавляем пожелания и дату выдачи
-            additional_info = f"📝 Пожелания: *{order_found[10] if order_found[10] and order_found[10] != '—' else '-'}*\n"
+            additional_info = f"\n📝 Пожелания: *{order_found[10] if order_found[10] and order_found[10] != '—' else '-'}*\n"
             additional_info += f"📅 Дата выдачи: *{order_found[11]}*\n\n"
             additional_info += f"_📨 Время заказа: {order_found[1]}_"
             
