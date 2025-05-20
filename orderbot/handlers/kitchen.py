@@ -179,7 +179,7 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
                 status_emoji = "🛎"
             
             # Формируем сообщение с информацией о заказе в новом формате с эмодзи
-            message = f"🔢 Заказ №*{order_found[0]}*\n\n"
+            message = f"Заказ №*{order_found[0]}*\n\n"
             message += f"⏰ Статус: *{status_emoji} {order_found[2]}*\n\n"
             message += f"🏠 Комната: *{order_found[6]}*\n"
             message += f"👤 Имя: *{order_found[7]}*\n"
@@ -343,9 +343,11 @@ async def find_orders_by_room(update: Update, context: ContextTypes.DEFAULT_TYPE
                     status_mark = "💰 "
                 elif order[2] == 'Оплачен':
                     status_mark = "✅ "
+                elif order[2] == 'Принят':
+                    status_mark = "🛎 "
                 
                 # Изменяем порядок отображения информации о заказе
-                order_text = f"{status_mark}🔢 Заказ №*{order[0]}*\n"
+                order_text = f"{status_mark}Заказ №*{order[0]}*\n"
                 order_text += f"👤 Имя: *{order[7]}*\n"
                 order_text += f"🍽 Время: *{translations.get_meal_type(order[8])}*\n"
                 
