@@ -954,6 +954,12 @@ async def ask_meal_type(update: telegram.Update, context: telegram.ext.ContextTy
         
         # Если мы пришли из другого места по кнопке new_order, начинаем с получения данных пользователя
         if query.data == 'new_order':
+            # Отправляем промежуточное сообщение
+            processing_message = await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="⏳ Начинаем заказ..."
+            )
+            
             # Получаем данные пользователя
             user_id = str(update.effective_user.id)
             user_data = await get_user_data(user_id)
@@ -988,7 +994,13 @@ async def ask_meal_type(update: telegram.Update, context: telegram.ext.ContextTy
                 sent_message = await query.message.reply_text(order_message)
                 context.user_data['order_chat_id'] = sent_message.chat_id
                 context.user_data['order_message_id'] = sent_message.message_id
-    
+                
+            # Удаляем промежуточное сообщение
+            try:
+                await processing_message.delete()
+            except Exception as e:
+                logger.error(f"Ошибка при удалении промежуточного сообщения: {e}")
+
     order_message = await show_order_form(update, context)
     prompt_message = translations.get_message('choose_meal')
     
@@ -1091,10 +1103,19 @@ def _build_dish_keyboard(
 async def start_new_order(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE) -> int:
     """Начинает процесс создания нового заказа."""
     try:
+        # Отправляем промежуточное сообщение
+        processing_message = await update.message.reply_text("⏳ Начинаем заказ...")
+        
         user_id = str(update.effective_user.id)
         
         # Проверяем, авторизован ли пользователь
         if not is_user_authorized(user_id):
+            # Удаляем промежуточное сообщение
+            try:
+                await processing_message.delete()
+            except Exception as e:
+                logger.error(f"Ошибка при удалении промежуточного сообщения: {e}")
+                
             # Если пользователь не авторизован, запрашиваем номер телефона
             keyboard = [[KeyboardButton(translations.get_button('share_phone'), request_contact=True)]]
             reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
@@ -1103,6 +1124,12 @@ async def start_new_order(update: telegram.Update, context: telegram.ext.Context
             
         # Проверяем время заказа
         if not is_order_time():
+            # Удаляем промежуточное сообщение
+            try:
+                await processing_message.delete()
+            except Exception as e:
+                logger.error(f"Ошибка при удалении промежуточного сообщения: {e}")
+                
             keyboard = [[InlineKeyboardButton(translations.get_button('ask_question'), callback_data='question')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(
@@ -1155,6 +1182,12 @@ async def start_new_order(update: telegram.Update, context: telegram.ext.Context
         prompt_message = translations.get_message('choose_meal')
         sent_message = await update.message.reply_text(prompt_message, reply_markup=reply_markup)
         context.user_data['prompt_message_id'] = sent_message.message_id
+        
+        # Удаляем промежуточное сообщение
+        try:
+            await processing_message.delete()
+        except Exception as e:
+            logger.error(f"Ошибка при удалении промежуточного сообщения: {e}")
         
         return MEAL_TYPE
         
