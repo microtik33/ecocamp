@@ -163,6 +163,7 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
             is_awaiting_payment = order_found[2] == 'Ожидает оплаты'
             is_paid = order_found[2] == 'Оплачен'
             is_cancelled = order_found[2] == 'Отменён'
+            is_active = order_found[2] == 'Активен'
             
             # Добавляем эмодзи для разных статусов заказов
             status_emoji = ""
@@ -172,13 +173,17 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
                 status_emoji = "💰"
             elif is_paid:
                 status_emoji = "✅"
+            elif is_active:
+                status_emoji = "✏️"
+            elif is_accepted:
+                status_emoji = "🛎"
             
             # Формируем сообщение с информацией о заказе в новом формате с эмодзи
             message = f"🔢 Заказ №*{order_found[0]}*\n\n"
             message += f"⏰ Статус: *{status_emoji} {order_found[2]}*\n\n"
             message += f"🏠 Комната: *{order_found[6]}*\n"
             message += f"👤 Имя: *{order_found[7]}*\n"
-            message += f"🍽 Время: *{translations.get_meal_type(order_found[8])}*\n"
+            message += f"🍽 Время: *{translations.get_meal_type(order_found[8])}* ({order_found[11]})\n"
             
             # Подготавливаем блюда для отображения
             dishes_list = []
