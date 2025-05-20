@@ -311,6 +311,20 @@ async def find_orders_by_room(update: Update, context: ContextTypes.DEFAULT_TYPE
                     continue
         
         if room_orders:
+            # Сортируем заказы по типу еды (завтрак - обед - ужин)
+            def meal_type_priority(order):
+                meal_type = order[8]  # Тип еды в колонке 8
+                if meal_type == 'Завтрак':
+                    return 0
+                elif meal_type == 'Обед':
+                    return 1
+                elif meal_type == 'Ужин':
+                    return 2
+                return 3  # Для других типов (если есть)
+            
+            # Сортируем список заказов
+            room_orders.sort(key=meal_type_priority)
+            
             # Формируем заголовок для сообщений
             header = f"📋 Заказы для комнаты {room_number} на сегодня ({today.strftime('%d.%m.%Y')}):\n\n"
             
