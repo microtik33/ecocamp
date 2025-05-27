@@ -35,9 +35,9 @@ async def setup_commands_for_user(bot, user_id=None, is_cook=False, is_admin=Fal
         admin_commands = [
             BotCommand("kitchen", "Сводка для кухни"),
             BotCommand("update", "Обновить кэши меню"),
+            BotCommand("recount", "Пересчитать учёт заказов за последние 3 дня"),
             BotCommand("stats", "Статистика производительности"),
-            BotCommand("clearstats", "Очистить статистику производительности"),
-            BotCommand("recount", "Пересчитать данные за последние 3 дня")
+            BotCommand("clearstats", "Очистить статистику производительности")
         ]
         base_commands.extend(admin_commands)
     

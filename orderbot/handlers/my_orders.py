@@ -123,9 +123,16 @@ async def show_user_orders(update: telegram.Update, context: telegram.ext.Contex
                     logger.error(f"Ошибка при парсинге количеств блюд: {e}")
             
             for dish in dishes:
-                escaped_dish = escape_markdown_v2(dish)
-                quantity = quantities.get(dish, 1) if has_quantities else 1
-                order_info += f"  • {escaped_dish} x{quantity}\n"
+                # Проверяем, содержит ли блюдо уже информацию о количестве
+                if ' x' in dish:
+                    # Блюдо уже содержит количество, просто экранируем и отображаем как есть
+                    escaped_dish = escape_markdown_v2(dish)
+                    order_info += f"  • {escaped_dish}\n"
+                else:
+                    # Блюдо не содержит количество, добавляем из quantities или по умолчанию 1
+                    escaped_dish = escape_markdown_v2(dish)
+                    quantity = quantities.get(dish, 1) if has_quantities else 1
+                    order_info += f"  • {escaped_dish} x{quantity}\n"
             
             escaped_wishes = escape_markdown_v2(order[10])
             order_info += f"📝 Пожелания: {escaped_wishes}\n"
@@ -311,9 +318,16 @@ async def show_today_orders(update: telegram.Update, context: telegram.ext.Conte
                     logger.error(f"Ошибка при парсинге количеств блюд: {e}")
             
             for dish in dishes:
-                escaped_dish = escape_markdown_v2(dish)
-                quantity = quantities.get(dish, 1) if has_quantities else 1
-                order_info += f"  • {escaped_dish} x{quantity}\n"
+                # Проверяем, содержит ли блюдо уже информацию о количестве
+                if ' x' in dish:
+                    # Блюдо уже содержит количество, просто экранируем и отображаем как есть
+                    escaped_dish = escape_markdown_v2(dish)
+                    order_info += f"  • {escaped_dish}\n"
+                else:
+                    # Блюдо не содержит количество, добавляем из quantities или по умолчанию 1
+                    escaped_dish = escape_markdown_v2(dish)
+                    quantity = quantities.get(dish, 1) if has_quantities else 1
+                    order_info += f"  • {escaped_dish} x{quantity}\n"
             
             escaped_wishes = escape_markdown_v2(order[10])
             order_info += f"📝 Пожелания: {escaped_wishes}\n"
@@ -632,9 +646,32 @@ async def show_paid_orders(update: telegram.Update, context: telegram.ext.Contex
             
             # Разбиваем строку с блюдами на отдельные блюда и форматируем каждое
             dishes = order[9].split(', ')
+            
+            # Получаем количества, если они доступны
+            has_quantities = False
+            quantities = {}
+            
+            # Проверяем, есть ли дополнительная колонка с количествами (12-я колонка)
+            if len(order) > 12 and order[12]:
+                try:
+                    # Парсим JSON строку с количествами
+                    import json
+                    quantities = json.loads(order[12].replace("'", '"'))
+                    has_quantities = True
+                except Exception as e:
+                    logger.error(f"Ошибка при парсинге количеств блюд: {e}")
+            
             for dish in dishes:
-                escaped_dish = escape_markdown_v2(dish)
-                order_info += f"  • {escaped_dish}\n"
+                # Проверяем, содержит ли блюдо уже информацию о количестве
+                if ' x' in dish:
+                    # Блюдо уже содержит количество, просто экранируем и отображаем как есть
+                    escaped_dish = escape_markdown_v2(dish)
+                    order_info += f"  • {escaped_dish}\n"
+                else:
+                    # Блюдо не содержит количество, добавляем из quantities или по умолчанию 1
+                    escaped_dish = escape_markdown_v2(dish)
+                    quantity = quantities.get(dish, 1) if has_quantities else 1
+                    order_info += f"  • {escaped_dish} x{quantity}\n"
             
             escaped_wishes = escape_markdown_v2(order[10])
             order_info += f"📝 Пожелания: {escaped_wishes}\n"
