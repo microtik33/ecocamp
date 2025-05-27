@@ -871,21 +871,43 @@ def _update_today_menu_cache(force=False):
             
             if today_menu_row:
                 # Получаем названия блюд из диапазона колонок с 3 по 41
-                dishes = [dish.strip() for dish in today_menu_row[2:41] if dish.strip()]
-                _today_menu_cache["dishes"] = dishes
+                all_dishes = [dish.strip() for dish in today_menu_row[2:41] if dish.strip()]
+                
+                # Группируем блюда по типам приема пищи
+                grouped_dishes = {
+                    'Завтрак': [],
+                    'Обед': [],
+                    'Ужин': []
+                }
+                
+                current_meal_type = None
+                
+                for dish in all_dishes:
+                    # Проверяем, является ли элемент названием типа приема пищи
+                    if dish in ['Завтрак', 'Обед', 'Ужин']:
+                        current_meal_type = dish
+                    elif current_meal_type and dish:
+                        # Добавляем блюдо к текущему типу приема пищи
+                        grouped_dishes[current_meal_type].append(dish)
+                
+                _today_menu_cache["dishes"] = grouped_dishes
                 _last_today_menu_update = current_time
                 logging.info(f"Кэш меню на сегодня обновлен в {datetime.fromtimestamp(current_time).strftime('%Y-%m-%d %H:%M:%S')}")
             else:
                 logging.info(f"Меню на сегодня ({today}) не найдено в таблице")
-                _today_menu_cache["dishes"] = []
+                _today_menu_cache["dishes"] = {'Завтрак': [], 'Обед': [], 'Ужин': []}
                 _last_today_menu_update = current_time
         except Exception as e:
             logging.error(f"Ошибка при обновлении кэша меню на сегодня: {e}")
 
 def get_today_menu_dishes():
-    """Получение списка блюд из меню на сегодня."""
+    """Получение списка блюд из меню на сегодня, сгруппированных по типам приема пищи.
+    
+    Returns:
+        Dict[str, List[str]]: Словарь с ключами 'Завтрак', 'Обед', 'Ужин' и списками блюд
+    """
     _update_today_menu_cache()
-    return _today_menu_cache.get("dishes", [])
+    return _today_menu_cache.get("dishes", {'Завтрак': [], 'Обед': [], 'Ужин': []})
 
 async def force_update_today_menu_cache():
     """Принудительно обновляет кэш меню на сегодня."""

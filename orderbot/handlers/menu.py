@@ -401,9 +401,12 @@ async def show_today_menu(update: telegram.Update, context: telegram.ext.Context
         
         try:
             # Получаем блюда из кэша меню на сегодня
-            dishes = get_today_menu_dishes()
+            dishes_by_meal = get_today_menu_dishes()
             
-            if not dishes:
+            # Проверяем, есть ли блюда в меню
+            has_dishes = any(dishes for dishes in dishes_by_meal.values())
+            
+            if not has_dishes:
                 message = "Меню на сегодня не найдено."
                 keyboard = [[InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
@@ -418,20 +421,30 @@ async def show_today_menu(update: telegram.Update, context: telegram.ext.Context
             today_display = datetime.now().strftime("%d.%m")
             message = f"🍽️ Меню на сегодня ({today_display}):\n\n"
             
-            # Получаем информацию о составе и калорийности для каждого блюда
-            if dishes:
-                for dish in dishes:
-                    composition_info = get_dish_composition(dish)
-                    message += f"*{dish}*\n"
-                    if composition_info['composition']:
-                        message += f"{composition_info['composition']}\n"
-                    else:
-                        message += "Состав не указан\n"
-                    if composition_info['calories']:
-                        message += f"_{composition_info['calories']} ккал_\n"
-                    message += "\n"
-            else:
-                message += "Нет доступных блюд на сегодня.\n"
+            # Функция для добавления блюд определенного типа в сообщение
+            def add_dishes_for_meal_type(meal_type: str) -> None:
+                nonlocal message
+                dishes = dishes_by_meal.get(meal_type, [])
+                
+                if dishes:
+                    message += f"*{meal_type}:*\n\n"
+                    for dish in dishes:
+                        composition_info = get_dish_composition(dish)
+                        message += f"*{dish}*\n"
+                        if composition_info['composition']:
+                            message += f"{composition_info['composition']}\n"
+                        else:
+                            message += "Состав не указан\n"
+                        if composition_info['calories']:
+                            message += f"_{composition_info['calories']} ккал_\n"
+                        message += "\n"
+                else:
+                    message += f"*{meal_type}:*\nНет доступных блюд\n\n"
+            
+            # Добавляем блюда для каждого типа приема пищи
+            add_dishes_for_meal_type('Завтрак')
+            add_dishes_for_meal_type('Обед')
+            add_dishes_for_meal_type('Ужин')
             
             # Кнопки навигации
             keyboard = [[InlineKeyboardButton(translations.get_button('back_to_menu'), callback_data='back_to_menu')]]
