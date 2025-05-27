@@ -2,7 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 from ..services.kitchen import get_orders_summary
-from ..services.sheets import is_user_cook, get_orders_sheet
+from ..services.sheets import is_user_cook, is_user_admin, get_orders_sheet
 from .. import translations
 from ..utils.auth_decorator import require_auth
 from datetime import datetime
@@ -10,8 +10,8 @@ from datetime import datetime
 @require_auth
 async def kitchen_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает сводку по заказам для повара."""
-    # Проверяем, является ли пользователь поваром
-    if not is_user_cook(str(update.effective_user.id)):
+    # Проверяем, является ли пользователь поваром или администратором
+    if not (is_user_cook(str(update.effective_user.id)) or is_user_admin(str(update.effective_user.id))):
         await update.message.reply_text("У вас нет доступа к этой команде.")
         return
     
@@ -79,8 +79,8 @@ async def search_orders_by_room(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
     
-    # Проверяем, является ли пользователь поваром
-    if not is_user_cook(str(update.effective_user.id)):
+    # Проверяем, является ли пользователь поваром или администратором
+    if not (is_user_cook(str(update.effective_user.id)) or is_user_admin(str(update.effective_user.id))):
         await query.edit_message_text("У вас нет доступа к этой функции.")
         return
     
@@ -102,8 +102,8 @@ async def search_orders_by_number(update: Update, context: ContextTypes.DEFAULT_
     query = update.callback_query
     await query.answer()
     
-    # Проверяем, является ли пользователь поваром
-    if not is_user_cook(str(update.effective_user.id)):
+    # Проверяем, является ли пользователь поваром или администратором
+    if not (is_user_cook(str(update.effective_user.id)) or is_user_admin(str(update.effective_user.id))):
         await query.edit_message_text("У вас нет доступа к этой функции.")
         return
     
@@ -123,8 +123,8 @@ async def handle_order_number_input(update: Update, context: ContextTypes.DEFAUL
     if not context.user_data.get('awaiting_order_number'):
         return
     
-    # Проверяем, является ли пользователь поваром
-    if not is_user_cook(str(update.effective_user.id)):
+    # Проверяем, является ли пользователь поваром или администратором
+    if not (is_user_cook(str(update.effective_user.id)) or is_user_admin(str(update.effective_user.id))):
         await update.message.reply_text("У вас нет доступа к этой функции.")
         return
     
@@ -282,8 +282,8 @@ async def find_orders_by_room(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer()
     
-    # Проверяем, является ли пользователь поваром
-    if not is_user_cook(str(update.effective_user.id)):
+    # Проверяем, является ли пользователь поваром или администратором
+    if not (is_user_cook(str(update.effective_user.id)) or is_user_admin(str(update.effective_user.id))):
         await query.edit_message_text("У вас нет доступа к этой функции.")
         return
     
@@ -431,8 +431,8 @@ async def back_to_kitchen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    # Проверяем, является ли пользователь поваром
-    if not is_user_cook(str(update.effective_user.id)):
+    # Проверяем, является ли пользователь поваром или администратором
+    if not (is_user_cook(str(update.effective_user.id)) or is_user_admin(str(update.effective_user.id))):
         await query.edit_message_text("У вас нет доступа к этой функции.")
         return
     

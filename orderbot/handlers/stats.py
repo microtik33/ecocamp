@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 from datetime import datetime
 import logging
 from ..utils.profiler import get_execution_stats, clear_stats
-from ..services.sheets import is_user_cook
+from ..services.sheets import is_user_admin
 from ..utils.auth_decorator import require_auth
 
 @require_auth
@@ -11,7 +11,7 @@ async def performance_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Команда для получения статистики производительности бота.
     
-    Только для поваров и админов.
+    Только для администраторов.
     
     Args:
         update: Объект обновления Telegram
@@ -19,8 +19,8 @@ async def performance_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     user_id = str(update.effective_user.id)
     
-    # Проверяем права доступа (только для поваров)
-    if not is_user_cook(user_id):
+    # Проверяем права доступа (только для администраторов)
+    if not is_user_admin(user_id):
         await update.message.reply_text("У вас нет доступа к этой команде.")
         return
     
@@ -95,7 +95,7 @@ async def clear_performance_stats(update: Update, context: ContextTypes.DEFAULT_
     """
     Очищает собранную статистику производительности.
     
-    Только для поваров и админов.
+    Только для администраторов.
     
     Args:
         update: Объект обновления Telegram
@@ -103,8 +103,8 @@ async def clear_performance_stats(update: Update, context: ContextTypes.DEFAULT_
     """
     user_id = str(update.effective_user.id)
     
-    # Проверяем права доступа (только для поваров)
-    if not is_user_cook(user_id):
+    # Проверяем права доступа (только для администраторов)
+    if not is_user_admin(user_id):
         await update.message.reply_text("У вас нет доступа к этой команде.")
         return
     

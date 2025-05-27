@@ -46,7 +46,7 @@ from aiohttp import web, ClientSession
 from datetime import datetime
 import pytz
 from .services.records import process_daily_orders
-from .services.sheets import auth_sheet, is_user_cook, force_update_menu_cache, force_update_composition_cache, force_update_today_menu_cache
+from .services.sheets import auth_sheet, is_user_cook, is_user_admin, force_update_menu_cache, force_update_composition_cache, force_update_today_menu_cache
 
 # Включаем tracemalloc для диагностики
 tracemalloc.start()
@@ -141,7 +141,8 @@ async def main() -> None:
         async def post_auth_command_setup(update: Update, context):
             user_id = update.effective_user.id
             is_cook = is_user_cook(str(user_id))
-            await setup_commands_for_user(context.bot, user_id, is_cook)
+            is_admin = is_user_admin(str(user_id))
+            await setup_commands_for_user(context.bot, user_id, is_cook, is_admin)
             return None
             
         # Добавляем обработчик для настройки команд после авторизации

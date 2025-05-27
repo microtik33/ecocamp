@@ -1,11 +1,18 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, BotCommand, BotCommandScopeChat, BotCommandScopeDefault
 from .. import translations
-from ..services.sheets import is_user_authorized, check_phone, save_user_id, is_user_cook
+from ..services.sheets import is_user_authorized, check_phone, save_user_id, is_user_cook, is_user_admin
 from ..services.user import update_user_info
 from .states import PHONE, MENU
 
-async def setup_commands_for_user(bot, user_id=None, is_cook=False):
-    """Устанавливает доступные команды для пользователя в меню команд."""
+async def setup_commands_for_user(bot, user_id=None, is_cook=False, is_admin=False):
+    """Устанавливает доступные команды для пользователя в меню команд.
+    
+    Args:
+        bot: Экземпляр бота
+        user_id: ID пользователя (опционально)
+        is_cook: Является ли пользователь поваром
+        is_admin: Является ли пользователь администратором
+    """
     base_commands = [
         BotCommand("new", "новый заказ"),
         BotCommand("menu", "меню на завтра"),
@@ -19,11 +26,19 @@ async def setup_commands_for_user(bot, user_id=None, is_cook=False):
     if is_cook:
         cook_commands = [
             BotCommand("kitchen", "Сводка для кухни"),
+            BotCommand("update", "Обновить кэши меню")
+        ]
+        base_commands.extend(cook_commands)
+    
+    # Добавляем команды для администраторов
+    if is_admin:
+        admin_commands = [
+            BotCommand("kitchen", "Сводка для кухни"),
             BotCommand("update", "Обновить кэши меню"),
             BotCommand("stats", "Статистика производительности"),
             BotCommand("clearstats", "Очистить статистику производительности")
         ]
-        base_commands.extend(cook_commands)
+        base_commands.extend(admin_commands)
     
     # Если пользователь указан, устанавливаем команды только для этого пользователя
     if user_id:
@@ -43,7 +58,8 @@ async def start(update, context):
     if is_user_authorized(user_id):
         # Если пользователь уже авторизован, обновляем список команд
         is_cook = is_user_cook(user_id)
-        await setup_commands_for_user(context.bot, int(user_id), is_cook)
+        is_admin = is_user_admin(user_id)
+        await setup_commands_for_user(context.bot, int(user_id), is_cook, is_admin)
         
         # Показываем основное меню
         keyboard = [
@@ -90,8 +106,11 @@ async def handle_phone(update, context):
             # Проверяем, является ли пользователь поваром
             is_cook = is_user_cook(user_id)
             
+            # Проверяем, является ли пользователь администратором
+            is_admin = is_user_admin(user_id)
+            
             # Устанавливаем команды для пользователя в зависимости от его роли
-            await setup_commands_for_user(context.bot, int(user_id), is_cook)
+            await setup_commands_for_user(context.bot, int(user_id), is_cook, is_admin)
             
             # Показываем основное меню
             keyboard = [

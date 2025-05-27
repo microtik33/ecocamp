@@ -353,6 +353,23 @@ def is_user_cook(user_id: str) -> bool:
         logging.error(f"Ошибка при проверке доступа повара: {e}")
         return False
 
+def is_user_admin(user_id: str) -> bool:
+    """Проверяет, является ли пользователь администратором.
+    
+    Args:
+        user_id: ID пользователя для проверки
+        
+    Returns:
+        bool: True если пользователь является администратором, False в противном случае
+    """
+    try:
+        # Получаем все ID администраторов из первого столбца
+        admin_ids = get_admins_ids()
+        return str(user_id) in admin_ids
+    except Exception as e:
+        logging.error(f"Ошибка при проверке доступа администратора: {e}")
+        return False
+
 def is_order_from_today(order_date_str: str) -> bool:
     """Проверяет, является ли заказ заказом на текущий день."""
     try:
@@ -1032,7 +1049,7 @@ async def save_question(user_id: str, question_text: str) -> bool:
         for row in users_data[1:]:  # Пропускаем заголовок
             if row[0] == user_id:
                 profile_link = row[1]  # Profile Link
-                phone = row[4]  # Phone Number
+                phone = row[3]  # Phone Number
                 break
         
         # Форматируем дату и время

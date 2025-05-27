@@ -8,7 +8,7 @@ from .order import MENU
 from ..services.sheets import (
     get_dishes_for_meal, get_dish_composition, get_today_menu_dishes,
     force_update_menu_cache, force_update_composition_cache, force_update_today_menu_cache,
-    is_user_cook
+    is_user_cook, is_user_admin
 )
 from datetime import datetime, timedelta
 import logging
@@ -529,8 +529,8 @@ async def update_caches(update: telegram.Update, context: telegram.ext.ContextTy
     user = update.effective_user
     message = update.message or update.callback_query.message
     
-    # Проверяем, является ли пользователь поваром
-    if not is_user_cook(str(user.id)):
+    # Проверяем, является ли пользователь поваром или администратором
+    if not (is_user_cook(str(user.id)) or is_user_admin(str(user.id))):
         await message.reply_text("У вас нет доступа к этой команде.")
         return MENU
     
